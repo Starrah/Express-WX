@@ -1,0 +1,10 @@
+/.idea/
+/node_modules/
+/bld/
+/src/**/*.js
+/src/**/*.js.map
+/test/**/*.js
+/test/**/*.js.map
+/package-lock.json
+/example/package-lock.json
+/example/node_modules/

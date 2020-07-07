@@ -1,0 +1,47 @@
+{
+  "name": "express-wx",
+  "version": "1.0.0",
+  "description": "Express Router for building Wechat Offical Account Message Server easily, supporting loading request (message) handlers dynamically. 快速构建微信公众号消息后端，支持动态加载请求处理逻辑代码。",
+  "main": "bld/index.js",
+  "scripts": {
+    "test": "tsc && mocha -b --exit",
+    "build": "tsc -b tsconfig-build.json",
+    "dev": "tsc"
+  },
+  "keywords": [
+    "Wechat",
+    "Weixin",
+    "Router",
+    "dynamic"
+  ],
+  "author": "Starrah",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/chai": "^4.2.11",
+    "@types/express": "^4.17.7",
+    "@types/mocha": "^7.0.2",
+    "@types/node": "^14.0.18",
+    "@types/request-promise": "^4.1.46",
+    "chai": "^4.2.0",
+    "mocha": "^8.0.1",
+    "typescript": "^3.9.6"
+  },
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "crypto": "^1.0.1",
+    "delay": "^4.3.0",
+    "express": "^4.17.1",
+    "express-router-dynamic": "^1.0.7",
+    "request": "^2.88.2",
+    "request-promise": "^4.2.5",
+    "xml-js": "^1.6.11"
+  },
+  "private": false,
+  "repository": {
+    "url": "https://github.com/Starrah/express-wx",
+    "type": "Github"
+  },
+  "files": [
+    "bld/**/*.{js,d.ts}"
+  ]
+}
