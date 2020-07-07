@@ -8,8 +8,10 @@ import {loadRouter, watchRecursively} from "./watchFiles";
 import {IRouterHandler, IRouterMatcher} from "express-serve-static-core";
 import {WxJSApiSignParam} from './WXJSApi'
 
-// @ts-ignore
-export class _WXRouterBase implements Router {
+interface _WXRouterBase extends Router {
+}
+
+class _WXRouterBase implements Router {
     constructor(config: WXRouterConfig) {
         let base = Router()
         // @ts-ignore
