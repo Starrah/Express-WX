@@ -63,7 +63,9 @@ class _WXRouterBase implements Router {
                 if (this.config.finalResponseText) reo.res.wxText(this.config.finalResponseText)
                 else reo.res.wxNoResp()
             }
-            reo.next(err)
+            else {
+                reo.next(err)
+            }
             return
         }
         clo.lastNextCallIndex = curIndex
