@@ -43,7 +43,8 @@ export default async function ReqProcess(req: WXRequest, res: WXResponse, next, 
     await promisify(bodyParser.text({
         type: ['text/*', "*/xml"]
     }))(req, res)
-    if (req.header('content-type').indexOf('xml') !== -1) {
+    let content_type = req.header('content-type')
+    if (content_type && content_type.indexOf('xml') !== -1) {
         let xmlObj = xml2js(req.body, {compact: true})['xml']
         req.wx = parseMessageXml(xmlObj)
         req._rawXmlObj = xmlObj

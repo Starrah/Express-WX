@@ -50,7 +50,6 @@ class _WXRouterBase implements Router {
                 Object.assign(initDynamics, await loadRouter(oneDir))
             }
             this._handlerMap = initDynamics
-            this.triggerHandlersUpdate()
         })()
 
         // @ts-ignore
