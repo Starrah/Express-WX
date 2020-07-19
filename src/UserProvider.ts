@@ -2,6 +2,10 @@ import {WXRequest} from "./WXRequest";
 import {WXResponse} from "./WXResponse";
 import {RequestHandler} from "express";
 
+export interface ReqWithUser<T> {
+    user?: T
+}
+
 export interface UserProvider extends RequestHandler{
     (req: WXRequest, res: WXResponse, next)
 }

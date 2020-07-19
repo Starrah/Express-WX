@@ -1,10 +1,10 @@
 import {WXRequest} from "./WXRequest";
 import {WXResponse} from "./WXResponse";
 import {RequestHandler} from "express";
+import {WithNameForLog} from "./WXRouter";
 
-export interface WithPriority {
-    priority?: number,
-    nameForLog?: string
+export interface WithPriority extends WithNameForLog{
+    priority?: number
 }
 
 /**

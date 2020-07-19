@@ -74,6 +74,14 @@ export class WXMessageBasicPart {
         xmlSetText(xml, "ToUserName", this.openId, true)
         return xml
     }
+
+    toLog(): any {
+        let o = Object.assign({}, this)
+        delete o.openId
+        delete o.CreateTime
+        delete o.MsgId
+        return o
+    }
 }
 
 @WXMessageReceiveClass("text")
@@ -98,6 +106,10 @@ export class TextWXMessage extends WXMessageBasicPart {
         xml = super.toXML()
         xmlSetText(xml, "Content", this.text, true)
         return xml
+    }
+
+    toLog(): any {
+        return this.text
     }
 }
 
@@ -443,6 +455,10 @@ export class NoResponseWXMessage extends WXMessageBasicPart {
     }
 
     toXML(xml?) {
+        return null
+    }
+
+    toLog(): any {
         return null
     }
 }

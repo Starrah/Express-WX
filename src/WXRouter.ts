@@ -7,7 +7,6 @@ import {WXResponse} from "./WXResponse";
 import {loadRouter, watchRecursively} from "./watchFiles";
 import {IRouterHandler, IRouterMatcher} from "express-serve-static-core";
 import {WxJSApiSignParam} from './WXJSApi'
-import {WithPriority} from "./WXHandler";
 
 interface _WXRouterBase extends Router {
 }
@@ -119,7 +118,7 @@ class _WXRouterBase implements Router {
         }
 
         // 合并静态中间件
-        arr = arr.concat(this._staticHandlers.map((v: RequestHandler & WithPriority, index) => {
+        arr = arr.concat(this._staticHandlers.map((v: RequestHandler & WithNameForLog, index) => {
             // 如果导入的对象上不存在nameForLog属性，则添加上默认值"$static_{index}"
             v.nameForLog = v.nameForLog || "$static_" + index
             return v
@@ -171,3 +170,6 @@ export function WXRouter(config: WXRouterConfig): WXRouter {
     return new _WXRouterBase(config)
 }
 
+export interface WithNameForLog {
+    nameForLog?: any
+}
