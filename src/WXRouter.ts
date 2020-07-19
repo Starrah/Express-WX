@@ -1,4 +1,4 @@
-import {Router, RequestHandler, Request, Response} from 'express'
+import {Request, RequestHandler, Response, Router} from 'express'
 import {mergeConfigWithDefault, WXAPPInfo, WXRouterConfig} from "./config";
 import {extendPrototype} from "./utils";
 import ReqProcess from "./ReqProcess";
@@ -7,6 +7,7 @@ import {WXResponse} from "./WXResponse";
 import {loadRouter, watchRecursively} from "./watchFiles";
 import {IRouterHandler, IRouterMatcher} from "express-serve-static-core";
 import {WxJSApiSignParam} from './WXJSApi'
+import {WithPriority} from "./WXHandler";
 
 interface _WXRouterBase extends Router {
 }
@@ -118,7 +119,11 @@ class _WXRouterBase implements Router {
         }
 
         // 合并静态中间件
-        arr = arr.concat(this._staticHandlers)
+        arr = arr.concat(this._staticHandlers.map((v: RequestHandler & WithPriority, index) => {
+            // 如果导入的对象上不存在nameForLog属性，则添加上默认值"$static_{index}"
+            v.nameForLog = v.nameForLog || "$static_" + index
+            return v
+        }))
         arr.sort((a, b) => (b.priority || 0) - (a.priority || 0))
         this._handlers = arr
     }
@@ -164,9 +169,5 @@ export interface WXRouter extends _WXRouterBase, Router, RequestHandler {
 export function WXRouter(config: WXRouterConfig): WXRouter {
     // @ts-ignore
     return new _WXRouterBase(config)
-}
-
-export interface WithPriority {
-    priority?: number
 }
 

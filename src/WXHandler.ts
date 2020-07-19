@@ -1,7 +1,11 @@
 import {WXRequest} from "./WXRequest";
 import {WXResponse} from "./WXResponse";
 import {RequestHandler} from "express";
-import {WithPriority} from "./WXRouter";
+
+export interface WithPriority {
+    priority?: number,
+    nameForLog?: string
+}
 
 /**
  * 提供一个接口和一个简单的构造函数，以便您方便的构建WXHandler获得ts类型检查。

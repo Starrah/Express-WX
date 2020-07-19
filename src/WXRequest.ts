@@ -1,7 +1,6 @@
 import {Request} from "express"
 import {extendPrototype} from "./utils";
 import {WXRouter} from "./WXRouter";
-import {xml2js} from "xml-js";
 import {WXMessage} from "./WXMessage";
 
 export interface WXRequest extends Request {
@@ -9,9 +8,14 @@ export interface WXRequest extends Request {
 }
 
 export class WXRequest implements Request{
-    constructor(baseObj: Request, wxRouter: WXRouter) {
+    constructor(baseObj: Request, wx: WXMessage, wxRouter: WXRouter) {
         extendPrototype(baseObj, this)
-        this.wxRouter = wxRouter
+        // @ts-ignore
+        baseObj.__proto__ = this.__proto__;
+        (baseObj as WXRequest).wx = wx;
+        (baseObj as WXRequest).wxRouter = wxRouter
+        // @ts-ignore
+        return baseObj
     }
 
     /** 当前微信对应的WXRouter实例。 */

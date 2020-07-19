@@ -46,12 +46,15 @@ export default async function ReqProcess(req: WXRequest, res: WXResponse, next, 
     let content_type = req.header('content-type')
     if (content_type && content_type.indexOf('xml') !== -1) {
         let xmlObj = xml2js(req.body, {compact: true})['xml']
-        req.wx = parseMessageXml(xmlObj)
+        req = new WXRequest(req, parseMessageXml(xmlObj), wxRouter)
         req._rawXmlObj = xmlObj
-        req.wxRouter = wxRouter
 
+        res = new WXResponse(res)
+
+        req.res = res
+        res.req = req
         reo.req = req
-        reo.res = new WXResponse(res)
+        reo.res = res
     } else if (!wxRouter.config.allowNoneWXRequests) res.sendStatus(406)
     next(reo)
 }

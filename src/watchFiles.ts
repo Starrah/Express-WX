@@ -95,6 +95,9 @@ export async function loadRouter(path): Promise<{[k: string]: RequestHandler}> {
                 let lastPartNumber = lastPartStr.match(/^-?\d+(.\d+)?$/) ? Number(lastPartStr) : null
                 if (lastPartNumber) module.priority = lastPartNumber
 
+                // 如果导入的对象上不存在nameForLog属性，则添加上文件名作为默认值，以备可能的日志记录中使用
+                module.nameForLog = module.nameForLog || Path.basename(path, ".js")
+
                 let obj = {}
                 obj[path] = module
                 return obj
