@@ -1,4 +1,5 @@
 import {RequestHandler} from "express";
+import {FileOrConsoleLogger, Logger} from "./Logger";
 
 export interface WXAPPInfo {
     /**
@@ -51,6 +52,22 @@ export interface WXRouterConfig {
      * 当然该数组中的对象也可通过priority属性定义优先级。
      */
     staticHandlers?: Array<RequestHandler>
+
+    /**
+     * 使用的日志记录器。记录的是所有的日志，包括运行日志、报错日志等等，如果没有指定messageLogger的话也会记录消息日志到这里。
+     * 默认为记录到控制台的日志记录器。如果希望关闭日志记录功能，请传入null。
+     *
+     * 需要传入一个实现了Logger接口的实例。同时，也有许多自带的Logger实例可供使用，如记录到控制台或文件的FileOrConsoleLogger、
+     * 记录到MongoDB的MongoDBLogger等等，详见Logger.d.ts文件。
+     */
+    logger?: Logger
+
+    /**
+     * 使用的消息日志记录器。默认为使用logger属性中的日志记录器。
+     *
+     * 与logger属性相同，需要传入一个实现了Logger接口的实例
+     */
+    messageLogger?: Logger
 
     /**
      * 是否开启自动获取ACCESS_TOKEN的功能。默认为true。
@@ -117,6 +134,8 @@ const defaultConfig: WXRouterConfig = {
     appInfo: undefined,
     handlersDir: "./handlers",
     staticHandlers: [],
+    logger: new FileOrConsoleLogger(),
+    messageLogger: null,
     enbaleAcccesToken: true,
     enableJSAPI: false,
     debugToken: undefined,
@@ -128,7 +147,10 @@ const defaultConfig: WXRouterConfig = {
 
 export function mergeConfigWithDefault(config: WXRouterConfig): WXRouterConfig {
     for (let key in defaultConfig) {
-        if (config[key] === undefined) config[key] = defaultConfig[key]
+        // noinspection JSUnfilteredForInLoop
+        if (config[key] === undefined) { // noinspection JSUnfilteredForInLoop
+            config[key] = defaultConfig[key]
+        }
     }
     return config
 }

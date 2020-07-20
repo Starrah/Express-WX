@@ -36,7 +36,14 @@ export class WXResponse implements Response {
             sendStr = js2xml({xml: xmlObj}, {compact: true})
         }
         this.send(sendStr)
+        this.wxRouter.messageLogger.logMessage((this.req as WXRequest).wx, message, this._curHandler)
     }
+
+    get wxRouter(): WXRouter {
+        return (this.req as WXRequest).wxRouter
+    }
+
+    _curHandler: any
 
     /**
      * 向客户端回复文本消息的快速方法，使用本方法可以免去构造TextWXMessage的麻烦。

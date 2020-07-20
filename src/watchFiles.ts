@@ -65,7 +65,7 @@ export async function watchRecursively(path: string, extraCallback?: FsWatchCall
 }
 
 /**
- * 加载动态路由。path可以是目录也可以是文件名，目录的话就会递归加载，文件名就是只加载一个、返回只有一个元素的数组。
+ * 加载动态路由。path可以是目录也可以是文件名，目录的话就会递归加载，文件名就是只加载一个、返回只有一个元素的对象。
  */
 export async function loadRouter(path): Promise<{[k: string]: RequestHandler}> {
     path = Path.resolve(path)

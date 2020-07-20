@@ -4,9 +4,12 @@ import {extendPrototype} from "./utils";
 import ReqProcess from "./ReqProcess";
 import {WXRequest} from "./WXRequest";
 import {WXResponse} from "./WXResponse";
-import {loadRouter, watchRecursively} from "./watchFiles";
+import {generateOnChangeCb, loadRouter, watchRecursively} from "./watchFiles";
 import {IRouterHandler, IRouterMatcher} from "express-serve-static-core";
 import {WxJSApiSignParam} from './WXJSApi'
+import {Logger} from "./Logger";
+import * as delay from "delay";
+import * as Path from "path";
 
 interface _WXRouterBase extends Router {
 }
@@ -46,29 +49,41 @@ class _WXRouterBase implements Router {
 
         (async () => {
             for (let oneDir of handlersDirArr) {
-                await watchRecursively(oneDir)
+                await watchRecursively(oneDir, generateOnChangeCb(this))
                 Object.assign(initDynamics, await loadRouter(oneDir))
             }
             this._handlerMap = initDynamics
         })()
 
+        this.logger.log("WXRouter初始化成功！")
         // @ts-ignore
         return base
+    }
+
+    get logger(): Logger | null {
+        return this.config.logger
+    }
+
+    get messageLogger(): Logger | null {
+        return this.config.messageLogger || this.config.logger
     }
 
     private async _nextFunction(curIndex: number, clo: { lastNextCallIndex: number, curHandlers: RequestHandler[] }, reo: { req, res, next }, err?) {
         if (curIndex >= clo.curHandlers.length) {
             if (!err && reo.req.wx) {
-                if (this.config.finalResponseText) reo.res.wxText(this.config.finalResponseText)
+                if (this.config.finalResponseText) {
+                    reo.res._curHandler = {nameForLog: "$finalResponse"}
+                    reo.res.wxText(this.config.finalResponseText)
+                }
                 else reo.res.wxNoResp()
-            }
-            else {
+            } else {
                 reo.next(err)
             }
             return
         }
         clo.lastNextCallIndex = curIndex
         let handler = clo.curHandlers[curIndex]
+        reo.res._curHandler = handler
         let theNext = this._nextFunction.bind(this, curIndex + 1, clo, reo)
 
         try {
@@ -111,6 +126,36 @@ class _WXRouterBase implements Router {
     private _handlerMapField: { [k: string]: RequestHandler } = {}
     private _handlers: Array<RequestHandler> = []
 
+    // 为了实现更合理的handler刷新日志记录而使用
+    private _lastHandlerUpdateTime: Date = null
+
+    private async _logHandlersUpdate(innerCall: boolean = false) {
+        function _theRelativeDynamicFilePath(absPath: string): string {
+            let that = this
+            if (typeof that.config.handlersDir === "string") {
+                return Path.relative(that.config.handlersDir, absPath)
+            } else if (that.config.handlersDir.length === 1) {
+                return Path.relative(that.config.handlersDir[0], absPath)
+            } else return Path.relative(".", absPath)
+        }
+
+        if (!innerCall) {
+            if (!this._lastHandlerUpdateTime) {
+                this._lastHandlerUpdateTime = new Date()
+                while (this._lastHandlerUpdateTime) {
+                    await delay(200)
+                    await this._logHandlersUpdate(true)
+                }
+            } else this._lastHandlerUpdateTime = new Date()
+        } else {
+            // @ts-ignore
+            if ((new Date() - this._lastHandlerUpdateTime) >= 500) {
+                this._lastHandlerUpdateTime = null
+                this.logger.log(`动态重新加载消息处理函数的过程成功完成！加载了动态处理函数[${Object.getOwnPropertyNames(this._handlerMap).map((v) => _theRelativeDynamicFilePath.call(this, v))}]${this._staticHandlers.length ? `，和${this._staticHandlers.length}个静态处理函数。` : ""}`)
+            }
+        }
+    }
+
     triggerHandlersUpdate() {
         let arr = []
         for (let key in this._handlerMapField) {
@@ -125,6 +170,7 @@ class _WXRouterBase implements Router {
         }))
         arr.sort((a, b) => (b.priority || 0) - (a.priority || 0))
         this._handlers = arr
+        this._logHandlersUpdate()
     }
 
     get _handlerMap(): { [k: string]: RequestHandler } {
