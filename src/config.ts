@@ -1,5 +1,6 @@
 import {RequestHandler} from "express";
 import {FileOrConsoleLogger, Logger} from "./Logger";
+import {UserProvider} from "./UserProvider";
 
 export interface WXAPPInfo {
     /**
@@ -90,6 +91,20 @@ export interface WXRouterConfig {
     enableJSAPI?: boolean
 
     /**
+     * 此配置项需要传入一个UserProvider的实例，即一个可以根据openId产生用户信息的函数。可以是异步函数。
+     * 详见UserProvider的注释（见UserProvider.d.ts）
+     *
+     * 默认值为undefined，即不开启自动产生用户信息功能。
+     *
+     * 如果指定了本配置项，则对于每一条收到的消息，都会调用一次此配置项指定的的UserProvider函数，并令req.user=该调用用的返回值。
+     * 这样一来req上面就多出了一个user属性。此时的req对象可以用类型WXRequestWithUser<T>来指代（见UserProvider.d.ts）
+     *
+     * 注：微信公众平台提供了利用openId换取用户信息的接口（只有认证的帐号才有权限使用）。本框架提供了一个通过该接口获取用户详细信息的内置实现，
+     * 如果您希望对任何用户直接利用其openId请求微信接口获知用户信息，可以考虑把本配置项指定为WXAPIUserProvider()（见UserProvider.d.ts）。
+     */
+    userProvider?: UserProvider
+
+    /**
      * 对于微信发来的请求正常会按照微信官方文档中说的方式校验签名，如果签名校验不通过会直接返回403。
      *
      * 但是，考虑到debug的需求，特设置了此配置项，可以传入一个string。这样，如果收到的请求的请求参数
@@ -138,6 +153,7 @@ const defaultConfig: WXRouterConfig = {
     messageLogger: null,
     enbaleAcccesToken: true,
     enableJSAPI: false,
+    userProvider: undefined,
     debugToken: undefined,
     finalResponseText: undefined,
     autoCallNext: true,

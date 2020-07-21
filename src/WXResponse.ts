@@ -36,7 +36,7 @@ export class WXResponse implements Response {
             sendStr = js2xml({xml: xmlObj}, {compact: true})
         }
         this.send(sendStr)
-        this.wxRouter.messageLogger.logMessage((this.req as WXRequest).wx, message, this._curHandler)
+        this.wxRouter.messageLogger.logMessage(this.req as WXRequest, message, this._curHandler)
     }
 
     get wxRouter(): WXRouter {

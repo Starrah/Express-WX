@@ -10,6 +10,7 @@ import {WxJSApiSignParam} from './WXJSApi'
 import {Logger} from "./Logger";
 import * as delay from "delay";
 import * as Path from "path";
+import {WithPriority} from "./WXHandler";
 
 interface _WXRouterBase extends Router {
 }
@@ -163,7 +164,7 @@ class _WXRouterBase implements Router {
         }
 
         // 合并静态中间件
-        arr = arr.concat(this._staticHandlers.map((v: RequestHandler & WithNameForLog, index) => {
+        arr = arr.concat(this._staticHandlers.map((v: RequestHandler & WithPriority, index) => {
             // 如果导入的对象上不存在nameForLog属性，则添加上默认值"$static_{index}"
             v.nameForLog = v.nameForLog || "$static_" + index
             return v
@@ -200,11 +201,34 @@ class _WXRouterBase implements Router {
     }
 
     /**
+     * 获取accessToken。
+     *
+     * 如果accessToken未开启或者因故（网络问题、WXRouter刚刚初始化还未来得及获取等等）获取不到，会抛异常。
+     *
+     * 当然我们实现了机制、每隔一段时间会定期刷新accessToken从而避免它过期失效。然而，我们很难保证accessToken一定是有效的，
+     * 例如有其他的程序请求了accessToken会造成本程序之前请求的accessToken提前失效。不过，如果一旦出现了accessToken失效的情况
+     * （即微信API返回错误码40014），您可以手动调用异步方法updateAccessToken来请求微信API刷新access_token。
+     */
+    get accessToken(): string {
+        // TODO
+        throw Error("当前版本暂未实现此项功能。请期待后续更新，亦欢迎提交PR！")
+    }
+
+    /**
+     * 请求微信API刷新access_token。详见微信官方文档。
+     */
+    async updateAccessToken(): Promise<string> {
+        // TODO
+        throw Error("当前版本暂未实现此项功能。请期待后续更新，亦欢迎提交PR！")
+    }
+
+    /**
      * JSAPI签名
      * @return 签名signature，直接填入JS-SDK的config参数的signature字段即可。详见微信官方文档。
      */
     signJSAPI(param: WxJSApiSignParam): string {
-        throw Error("当前版本暂未实现微信JSAPI签名功能！")
+        // TODO
+        throw Error("当前版本暂未实现此项功能。请期待后续更新，亦欢迎提交PR！")
     }
 }
 
@@ -216,6 +240,3 @@ export function WXRouter(config: WXRouterConfig): WXRouter {
     return new _WXRouterBase(config)
 }
 
-export interface WithNameForLog {
-    nameForLog?: any
-}

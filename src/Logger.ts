@@ -4,39 +4,43 @@ import * as Path from "path"
 import * as Chalk from "chalk";
 import {promisify} from "util";
 import {WXHandler} from "./WXHandler";
-import {ReqWithUser} from "./UserProvider";
-import {WithNameForLog} from "./WXRouter";
+import {LoggableUser, WXRequestWithUser} from "./UserProvider";
 import * as Util from "util"
+import * as Mongoose from "mongoose"
+import {WXRequest} from "./WXRequest";
+
+const Mixed = Mongoose.Schema.Types.Mixed
 
 export type LogLevels = "ERROR" | "WARNING" | "INFO" | "MESSAGE" | "DEBUG"
 
 export interface Logger {
     log(data: any): Promise<void>
+
     log(data: any, level: LogLevels): Promise<void>
 
-    logMessage(reqWx: WXMessage, resWx: WXMessage, handler: WXHandler): Promise<void>
+    logMessage(req: WXRequest, resWx: WXMessage, handler: WXHandler): Promise<void>
 }
 
 interface _MessageLogObj {
     openId: string
-    user?: any
+    userData?: any
     req: any
     res: any
     handler?: string
 }
 
-type MessageLogObj = {[k in any]: any} & _MessageLogObj
+type MessageLogObj = { [k in any]: any } & _MessageLogObj
 
-function MessageLogObj(reqWx: WXMessage, resWx: WXMessage, handler: WXHandler): MessageLogObj {
+function MessageLogObj(req: WXRequest, resWx: WXMessage, handler: WXHandler, loggerInstance: Logger): MessageLogObj {
     let obj: MessageLogObj = {
-        openId: reqWx.openId,
-        req: reqWx.toLog(),
+        openId: req.wx.openId,
+        req: req.wx.toLog(),
         res: resWx.toLog(),
         handler: handler && handler.nameForLog
     }
-    let user = (reqWx as ReqWithUser<any>).user
+    let user = (req as WXRequestWithUser<any>).user
     if (user) {
-        obj.user = (user as WithNameForLog).nameForLog || user
+        obj.userData = (user as LoggableUser).toLogData?.(loggerInstance) || user
     }
     return obj
 }
@@ -50,7 +54,7 @@ export function isLegalLogger(o: any): boolean {
  *
  * 构造函数可以传入一个字符串格式参数，表示要记录到的文件的文件路径。**如果不传入此参数，则默认为记录到控制台。**
  */
-export class FileOrConsoleLogger implements Logger{
+export class FileOrConsoleLogger implements Logger {
     chalk: boolean
     toConsole: boolean = false
     path: string
@@ -64,8 +68,7 @@ export class FileOrConsoleLogger implements Logger{
         if (!path) {
             // 如果未传入合法路径则是默认输出到控制台
             this.toConsole = true
-        }
-        else {
+        } else {
             this.path = path
             Fs.mkdirSync(Path.dirname(this.path), {recursive: true})
             this.fd = Fs.openSync(this.path, "a")
@@ -88,20 +91,17 @@ export class FileOrConsoleLogger implements Logger{
         if (this.toConsole) {
             if (level === "ERROR" || level === "WARNING") {
                 console.error(this._prefix(level) + data)
-            }
-            else {
+            } else {
                 console.log(this._prefix(level) + data)
             }
-        }
-        else {
+        } else {
             await promisify(Fs.appendFile)(this.fd, this._prefix(level) + data + "\r\n")
         }
     }
 
-    async logMessage(reqWx: WXMessage, resWx: WXMessage, handler: WXHandler) {
-        let logObj = MessageLogObj(reqWx, resWx, handler)
-        let userStr = logObj.user && ((logObj.user as WithNameForLog).nameForLog || Util.format(logObj.user))
-        userStr = userStr? `(${userStr})`: ""
+    async logMessage(req: WXRequest, resWx: WXMessage, handler: WXHandler) {
+        let logObj = MessageLogObj(req, resWx, handler, this)
+        let userStr = logObj.userData? `(${logObj.userData})` : ""
         let logStr = `${Chalk.underline(logObj.openId + userStr)}: ${Util.inspect(logObj.req)} --> ${Util.inspect(logObj.res)}`
         await this.log(logStr, "MESSAGE")
     }
