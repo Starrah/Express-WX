@@ -106,3 +106,77 @@ export class FileOrConsoleLogger implements Logger {
         await this.log(logStr, "MESSAGE")
     }
 }
+
+/**
+ * 把日志记录到MongoDB的日志记录器。
+ *
+ * 构造函数必须传入一个MongoDB URI、一个Collection名字，并可选传入一个配置对象。详见构造函数的注释。
+ */
+export class MongoDBLogger implements Logger {
+    valid: boolean = false
+    model: Mongoose.Model<Mongoose.Document>
+    connection: Mongoose.Connection
+
+    /**
+     * @param mongoUri MongoDB的URI，形如mongodb://user:password@host:port/database
+     * @param collection 要存储日志的collection的名字
+     * @param option 选项配置。其中capped表示集合是否capped，dbName表示使用的database名字（不填则默认为uri中指定的那个database）。
+     * 而connectionOption和schemaOption定义的内容是直接原样传给mongoose.createConnection和new mongoose.Schema的，详见Mongoose.js官方文档。
+     */
+    constructor(mongoUri: string, collection: string, option?: {
+        capped?: boolean,
+        dbName?: string,
+        connectionOption?: Mongoose.ConnectionOptions,
+        schemaOption?: Mongoose.SchemaOptions
+    }) {
+        // option处理
+        option = option || {}
+        if (option.capped === undefined) option.capped = true
+        if (option.dbName !== undefined) {
+            option.connectionOption = option.connectionOption || {}
+            option.connectionOption.dbName = option.dbName
+        }
+        option.schemaOption = option.schemaOption || {}
+        option.schemaOption.capped = option.capped
+
+        // Schema构建
+        option.schemaOption.strict = false
+        option.schemaOption.versionKey = false
+        let schema = new Mongoose.Schema({
+            date: {type: Date, default: Date.now}, // 日期date对象
+            level: {type: String, default: "INFO"},
+            content: {type: String},
+            openId: {type: String},
+            user: {type: Mixed},
+            req: {type: Mixed},
+            handler: {type: String},
+            res: {type: Mixed}
+        }, option.schemaOption)
+
+        // 连接和model构建
+        let pendingConnection = Mongoose.createConnection(mongoUri, option.connectionOption)
+        pendingConnection.then(()=>{this.valid = true})
+        this.connection = pendingConnection
+        this.model = this.connection.model(collection, schema, collection)
+    }
+
+    async log(data: any, level: LogLevels = "INFO") {
+        if (typeof data === "function") data = data.name
+        if (typeof data !== "object") data = {content: data}
+        data.level = level
+        let modelObj = new this.model(data)
+        await Util.promisify(modelObj.save).call(modelObj)
+    }
+
+    async logMessage(req: WXRequest, resWx: WXMessage, handler: WXHandler) {
+        let logObj = MessageLogObj(req, resWx, handler, this)
+        let obj: any = {
+            openId: logObj.openId,
+            req: logObj.req,
+            handler: logObj.handler,
+            res: logObj.res
+        }
+        if (logObj.userData) obj.user = logObj.userData
+        await this.log(obj, "MESSAGE")
+    }
+}
