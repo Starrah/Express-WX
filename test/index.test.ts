@@ -2,8 +2,8 @@ import {expect} from "chai"
 import {describe, it} from "mocha"
 import * as request from "request-promise"
 import {xml2js} from "xml-js";
+import {app, url, wxRouter} from "./testApp";
 import * as delay from "delay";
-import {app, url} from "./testApp";
 
 app
 
@@ -12,6 +12,10 @@ function getRespText(xml): string {
 }
 
 describe("overall", () => {
+    it('initializeApp', async () => {
+        await wxRouter.tillInitialized()
+    }).timeout(10000);
+
     it('testStatic', async () => {
         let nowTime = Math.round(new Date().getTime() / 1000)
         let respXml = await request.post(url, {
@@ -29,7 +33,7 @@ describe("overall", () => {
             }
         })
         let respText = getRespText(respXml)
-        expect(respText).to.be.equal("resultStatic")
+        expect(respText).equal("resultStatic")
     })
 
     it('testSuccess', async () => {
@@ -49,7 +53,7 @@ describe("overall", () => {
                 "Content-Type": "text/xml"
             }
         })
-        expect(respXml).to.be.equal("success")
+        expect(respXml).equal("success")
     })
 
     it('testMain1', async () => {
@@ -69,6 +73,6 @@ describe("overall", () => {
             }
         })
         let respText = getRespText(respXml)
-        expect(respText).to.be.equal("resultT1_testMain1")
+        expect(respText).equal("resultT1_testMain1")
     })
 })

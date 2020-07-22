@@ -27,12 +27,12 @@ export async function watchRecursively(path: string, extraCallback?: FsWatchCall
 
         if (event == "rename" && !stat) {
             let type: "dirRemove" | "fileRemove" = watchers[filename] ? "dirRemove" : "fileRemove"
-            if (watchers[filename]) watchers[filename].close()
+            watchers[filename]?.close()
             delete watchers[filename]
             extraCallback(event, filename, type)
         } else if (event == "rename" && stat) {
             if (stat.isDirectory()) {
-                watch(filename)
+                watchDir(filename)
                 extraCallback(event, filename, "dirAdd")
             } else extraCallback(event, filename, "fileAdd")
         } else {
@@ -40,9 +40,9 @@ export async function watchRecursively(path: string, extraCallback?: FsWatchCall
         }
     }
 
-    function watch(dirname: string = path) {
+    function watchDir(dirname: string = path) {
         (async () => {
-            if (watchers[dirname]) watchers[dirname].close()
+            watchers[dirname]?.close()
             watchers[dirname] = Fs.watch(dirname,
                 (event, filename) =>
                     callback(event as any, Path.join(dirname, filename))
@@ -53,15 +53,22 @@ export async function watchRecursively(path: string, extraCallback?: FsWatchCall
                 )
             for await(let dir of await promisify(Fs.opendir)(dirname)) {
                 if (dir.isDirectory())
-                    watch(Path.join(dirname, dir.name))
+                    watchDir(Path.join(dirname, dir.name))
             }
         })().catch(reason => {
             console.warn(reason.message)
         })
     }
 
-    watch()
-
+    let stat = await promisify(Fs.stat)(Path.resolve(path))
+    if (stat.isDirectory()) watchDir() // 如果是目录，调用watchDir方法watch这个目录，其内部会自动递归watchDir所有子目录
+    else {
+        // 如果是文件，则只watch单个文件
+        let dirname = Path.dirname(Path.resolve(path))
+        Fs.watch(path, (event, filename) =>
+            callback(event as any, Path.join(dirname, filename))
+        )
+    }
 }
 
 /**

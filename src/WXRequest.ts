@@ -12,8 +12,10 @@ export class WXRequest implements Request{
         extendPrototype(baseObj, this)
         // @ts-ignore
         baseObj.__proto__ = this.__proto__;
-        (baseObj as WXRequest).wx = wx;
-        (baseObj as WXRequest).wxRouter = wxRouter
+        this.wx = wx;
+        this.wxRouter = wxRouter
+
+        Object.assign(baseObj, this)
         // @ts-ignore
         return baseObj
     }

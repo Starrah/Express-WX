@@ -14,6 +14,7 @@ export class WXResponse implements Response {
         extendPrototype(baseObj, this)
         // @ts-ignore
         baseObj.__proto__ = this.__proto__
+        Object.assign(baseObj, this)
         // @ts-ignore
         return baseObj
     }

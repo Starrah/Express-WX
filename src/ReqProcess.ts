@@ -22,6 +22,8 @@ function checkSignatureOrDebug(req: Request, wxRouter: WXRouter) {
 }
 
 export default async function ReqProcess(req: WXRequest, res: WXResponse, next, wxRouter: WXRouter, reo: {req, res, next}) {
+    // 检查生命周期情况，未初始化或已销毁则返回错误
+    if (!wxRouter.initialized || wxRouter.destroyed) res.sendStatus(503)
     // 若debug字段正确，则不检查超时和签名
     if (!(wxRouter.config.debugToken && (wxRouter.config.debugToken === req.query.debug ||
         wxRouter.config.debugToken === req.header("debug")))) {

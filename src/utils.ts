@@ -39,3 +39,28 @@ export function xmlSetText(xml, key: string, value: string, cdata = false) {
     else xml[key] = {_text: value}
     return xml
 }
+
+export function assertWXAPISuccess(resObj: any) {
+    if (!resObj || resObj.errcode) throw resObj
+}
+
+/**
+ * 把一个可能抛出异常的assert形式函数，转化为一个不会抛出异常、只会返回true或false的check形式函数
+ * （当然返回值也可能是包装了true或false的PromiseLike，如果传入的fn本身是异步函数的话）。
+ *
+ * 新的函数返回true当且仅当传入的fn正常运行完成、没有抛出异常。
+ * @param fn
+ */
+export function checkify(fn: Function) {
+    return function (...args): boolean {
+        try {
+            let res = fn.call(this, ...args)
+            if (!(res && res.then && res.catch)) { // 如果不是PromiseLike
+                return true
+            }
+            else return res.then(()=>true).catch(()=>false)
+        } catch (e) {
+            return false
+        }
+    }
+}
