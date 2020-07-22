@@ -5,18 +5,19 @@ import {WXResponse} from "./WXResponse";
 import {WXRouter} from "./WXRouter";
 import * as bodyParser from "body-parser";
 import {promisify} from "util";
-import {xml2js, js2xml} from "xml-js";
+import {xml2js} from "xml-js";
 import {parseMessageXml} from "./WXMessage";
-js2xml
 
-export function checkSignature(token: string, {nonce, signature, timestamp}) {
-    return crypto.createHash('sha1')
-        .update([token, timestamp, nonce].sort().join(''))
-        .digest('hex') == signature
+export function signFields(arr: Array<string>, separator: string = ''): string {
+    return crypto.createHash('sha1').update(arr.sort().join(separator)).digest('hex')
 }
 
-function checkSignatureOrDebug(req: Request, wxRouter: WXRouter) {
-    return checkSignature(wxRouter.appInfo.token, req.query as any) ||
+export function checkWXSignature(token: string, {nonce, signature, timestamp}) {
+    return signFields([token, timestamp, nonce]) == signature
+}
+
+function checkWXSignatureOrDebug(req: Request, wxRouter: WXRouter) {
+    return checkWXSignature(wxRouter.appInfo.token, req.query as any) ||
         (wxRouter.config.debugToken &&
             (wxRouter.config.debugToken === req.query.debug || wxRouter.config.debugToken === req.header("debug")))
 }
@@ -32,7 +33,7 @@ export default async function ReqProcess(req: WXRequest, res: WXResponse, next, 
             res.sendStatus(408)
             return;
         }
-        if (!checkSignatureOrDebug(req, wxRouter)) {
+        if (!checkWXSignatureOrDebug(req, wxRouter)) {
             res.sendStatus(403)
             return;
         }

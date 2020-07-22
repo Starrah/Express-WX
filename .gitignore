@@ -5,6 +5,5 @@
 /src/**/*.js.map
 /test/**/*.js
 /test/**/*.js.map
-/package-lock.json
 /example/package-lock.json
 /example/node_modules/

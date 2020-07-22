@@ -1,17 +1,18 @@
 import {Request, RequestHandler, Response, Router} from 'express'
 import {mergeConfigWithDefault, WXAPPInfo, WXRouterConfig} from "./config";
 import {assertWXAPISuccess, checkify, extendPrototype} from "./utils";
-import ReqProcess from "./ReqProcess";
+import ReqProcess, {signFields} from "./ReqProcess";
 import {WXRequest} from "./WXRequest";
 import {WXResponse} from "./WXResponse";
 import {generateOnChangeCb, loadRouter, watchRecursively} from "./watchFiles";
 import {IRouterHandler, IRouterMatcher} from "express-serve-static-core";
-import {WxJSApiSignParam} from './WXJSApi'
+import {WxJSApiSignParam, WxJSApiSignResult} from './WXJSApi'
 import {Logger} from "./Logger";
 import * as delay from "delay";
 import * as Path from "path";
 import {WithPriority} from "./WXHandler";
 import * as SendRequest from "request-promise"
+import * as RandomString from "randomstring"
 
 interface _WXRouterBase extends Router {
 }
@@ -31,6 +32,7 @@ class _WXRouterBase implements Router {
     get destroyed(): boolean {
         return this._destroyed
     }
+
     /** 返回一个Promise，它在当前WXRouter对象初始化完成后才予以resolve。只要初始化没有完成，就会一直pending。*/
     async tillInitialized() {
         while (!this.initialized) {
@@ -38,6 +40,7 @@ class _WXRouterBase implements Router {
         }
         return
     }
+
     private _onDestroy() {
         this._destroyed = true
         this.logger.log("WXRouter被销毁！", "WARNING")
@@ -98,7 +101,7 @@ class _WXRouterBase implements Router {
             // 建立定时任务和accessToken初次获取
             // 无论何种情况（是否开启enbaleAccessToken、是否配置APPID），都一定会建立每10分钟刷新accessToken的定时任务。
             // 这是为了防止用户在代码的其他地方运行时修改config和appInfo，我们的逻辑也能正常工作。
-            const TRY_UPDATE_CALL_INTERVAL = 20000;
+            const TRY_UPDATE_CALL_INTERVAL = 600000;
             // noinspection ES6MissingAwait
             (async () => {
                 while (!this.destroyed) { // 只要WXRouter没被摧毁，就一直运行
@@ -108,6 +111,7 @@ class _WXRouterBase implements Router {
             })()
             if (await checkify(this._assertAccessTokenAvailable).call(this)) { // 如果经检查、获取所需要的配置正确的话
                 await this.updateAccessToken(true) //则尝试获取一次，此次获取失败的异常直接抛出
+                if (this.config.enableJSAPI) await this.updateJsapiTicket(true)
             }
 
             this._initialized = true
@@ -273,7 +277,6 @@ class _WXRouterBase implements Router {
      */
     get accessToken(): string {
         this._assertAccessTokenAvailable()
-        this.assertInitialized()
         if (!this._accessToken) throw Error("没有有效的access_token可供使用！这可能是因为组件刚刚初始化还未来得及拿到accessToken，请稍后再试！")
         return this._accessToken
     }
@@ -317,8 +320,10 @@ class _WXRouterBase implements Router {
         try {
             this._assertAccessTokenAvailable()
             // @ts-ignore
-            if (!this._lastHandlerUpdateTime || new Date() - this._lastHandlerUpdateTime >= AUTO_UPDATE_ACCESS_TOKEN_INTERVAL) {
-                return await this.updateAccessToken(true)
+            if (new Date() - this._lastAccessTokenUpdateTime >= AUTO_UPDATE_ACCESS_TOKEN_INTERVAL) {
+                let accessToken = await this.updateAccessToken(true)
+                if (this.config.enableJSAPI) await this.updateJsapiTicket(true)
+                return accessToken
             } else return null
         } catch (e) {
             // 如果是配置原因造成的定时刷新失败（包括enableAccessToken未打开、APPID未配置等情况），则不要抛异常，返回null就够了。
@@ -326,13 +331,51 @@ class _WXRouterBase implements Router {
         }
     }
 
+    private _jsapiTicket: string = null
+
+    async updateJsapiTicket(_requestByAutoUpdate = false): Promise<string> {
+        try {
+            let accessToken = this.accessToken
+            let resObj = await SendRequest.get("https://api.weixin.qq.com/cgi-bin/ticket/getticket", {
+                qs: {
+                    access_token: accessToken,
+                    type: "jsapi"
+                },
+                json: true
+            })
+            assertWXAPISuccess(resObj)
+            this._jsapiTicket = resObj.ticket
+            this.logger.log((_requestByAutoUpdate ? "自动" : "手动") + "刷新JSAPI_TIKET成功！", "INFO")
+            return resObj.ticket
+        } catch (e) {
+            this.logger.log((_requestByAutoUpdate ? "自动" : "手动") + "刷新JSAPI_TIKET失败！ " + e, "WARNING")
+            throw e
+        }
+    }
+
     /**
      * JSAPI签名
-     * @return 签名signature，直接填入JS-SDK的config参数的signature字段即可。详见微信官方文档。
+     * @return 签名所需的字段。详见WxJSApiSignParam接口注释。
      */
-    signJSAPI(param: WxJSApiSignParam): string {
-        // TODO
-        throw Error("当前版本暂未实现此项功能。请期待后续更新，亦欢迎提交PR！")
+    async signJSAPI(param: WxJSApiSignParam): Promise<WxJSApiSignResult> {
+        if (!param.url) throw Error("传入的参数中缺少ur字段！")
+        param.timestamp = param.timestamp || Math.round(new Date().getTime() / 1000)
+        param.noncestr = param.noncestr || RandomString.generate()
+        if (!this.config.enableJSAPI) throw Error("config中的enableJSAPI配置没有开启！")
+        if (!this._jsapiTicket) await this.updateJsapiTicket(true)
+        let toSignFields = [
+            `jsapi_ticket=${this._jsapiTicket}`,
+            `url=${param.url}`,
+            `noncestr=${param.noncestr}`,
+            `timestamp=${param.timestamp}`
+        ]
+        let signature = signFields(toSignFields, "&")
+        return {
+            appId: this.appInfo.APPID,
+            timestamp: param.timestamp,
+            nonceStr: param.noncestr,
+            signature
+        }
     }
 }
 
