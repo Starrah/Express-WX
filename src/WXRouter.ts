@@ -10,7 +10,7 @@ import {WxJSApiSignParam, WxJSApiSignResult} from './WXJSApi'
 import {Logger} from "./Logger";
 import * as delay from "delay";
 import * as Path from "path";
-import {WithPriority} from "./WXHandler";
+import {WithPriority, WXHandler} from "./WXHandler";
 import * as SendRequest from "request-promise"
 import * as RandomString from "randomstring"
 import {WXRequestWithUser} from "./UserProvider";
@@ -131,6 +131,17 @@ class _WXRouterBase implements Router {
         return this.config.messageLogger || this.config.logger
     }
 
+    // noinspection JSUnusedLocalSymbols
+    private _predefinedMiddleware = WXHandler(async function (req: WXRequestWithUser<any>, res, next) {
+        if (this.config.userProvider) {
+            try {
+                req.user = await this.config.userProvider.call(this, req.wx.openId)
+            } catch (e) {
+                this.logger.log(`利用userProvider获取用户信息失败！openId:${req.wx.openId},异常：${Util.format(e)}`, "WARNING")
+            }
+        }
+    }, 10010) // 比10000大的一个优先级值
+
     private async _nextFunction(curIndex: number, clo: { lastNextCallIndex: number, curHandlers: RequestHandler[] }, reo: { req, res, next }, err?) {
         if (curIndex >= clo.curHandlers.length) {
             if (!err && reo.req.wx) {
@@ -219,7 +230,7 @@ class _WXRouterBase implements Router {
     }
 
     triggerHandlersUpdate() {
-        let arr = []
+        let arr = [this._predefinedMiddleware]
         for (let key in this._handlerMapField) {
             arr.push(this._handlerMapField[key])
         }
