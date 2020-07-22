@@ -128,7 +128,6 @@ It is very welcomed to raise Issues and/or make Pull Requests. Though English do
 
 ## 更新计划
 以下是计划在未来逐步实现的功能（按顺序）。欢迎提交Pull Request！
-- UserProvider的实现（基于mongodb的用户管理）
 - 发送模版消息
 - 素材管理接口  
   

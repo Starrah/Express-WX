@@ -1,6 +1,7 @@
 import {WXRequest} from "./WXRequest";
 import {Logger, MongoDBLogger} from "./Logger";
 import * as Mongoose from "mongoose"
+import {Document, Model, Schema} from "mongoose";
 import * as SendRequest from "request-promise";
 import {assertWXAPISuccess} from "./utils";
 import {WXRouter} from "./WXRouter";
@@ -95,18 +96,46 @@ export function WXAPIUserProvider(userInfoCacheTimeMs: number = 7200000, toLogDa
  * 这是一个构造函数，它返回的是一个UserProvider。
  *
  * 被返回的UserProvider的作用即是根据openId，在指定的MongoDB collection中查找出用户对应的数据对象（T类型）。
- * 返回的对象直接是Mongoose的Model<Document & T>实例，因而对用户的数据的增删改也同样很方便。
+ * 返回的对象类型是T & mongoose.Document，同时具有T指定的属性和mongoose提供的文档操作接口，因而对用户的数据的增删改也同样很方便。
  *
  * @constructor
  * @param mongoUri MongoDB的URI，形如mongodb://user:password@host:port/database
  * @param schema 用户数据对应的mongoose.Schema。
+ * @param toLogData 必填，指定如何把用户转换为日志格式。
  * @param option 选项配置。其中dbName表示使用的database名字（不填则默认为uri中指定的那个database）。
  * 而connectionOption的内容是直接原样传给mongoose.createConnection的。
  */
-export function MongoDBUserProvider<T>(mongoUri: string, schema: Mongoose.Schema, option?: {
+export function MongoDBUserProvider<T>(mongoUri: string, schema: Schema, toLogData: (loggerInstance: Logger) => any, option?: {
     dbName?: string,
     connectionOption?: Mongoose.ConnectionOptions,
+    openIdFieldName?: string
 }): UserProvider {
-    // TODO
-    throw Error("当前版本暂未实现此项功能。请期待后续更新，亦欢迎提交PR！")
+    // option处理
+    option = option || {}
+    if (option.dbName !== undefined) {
+        option.connectionOption = option.connectionOption || {}
+        option.connectionOption.dbName = option.dbName
+    }
+    let openIdName = option.openIdFieldName || "openId"
+
+    let resFunc: ((openId: string) => Promise<T & Document>) & { valid: boolean, model: Model<T & Document> }
+    let connection = Mongoose.createConnection(mongoUri, option.connectionOption)
+    connection.then(() => {
+        resFunc.valid = true
+    }).catch(() => {
+        resFunc.valid = false
+    })
+    schema.index(openIdName)
+    let model: Model<T & Document> = connection.model(schema.get("collection"), schema)
+    // @ts-ignore
+    resFunc = async function (openId: string): T {
+        if (resFunc.valid === false) throw Error("MongoDB连接失败，故无法查询用户！")
+        let queryParam = {}
+        queryParam[openIdName] = openId
+        let res: T & Document = await resFunc.model.findOne(queryParam);
+        if (res) (res as LoggableUser).toLogData = toLogData
+        return res
+    }
+    resFunc.model = model
+    return resFunc
 }
