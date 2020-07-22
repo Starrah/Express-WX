@@ -180,3 +180,29 @@ export class MongoDBLogger implements Logger {
         await this.log(obj, "MESSAGE")
     }
 }
+
+/**
+ * 可以用于把把日志同时记录到多个logger的logger。
+ */
+export class WrapManyLogger implements Logger {
+    loggerList: Array<Logger> = []
+
+    /**
+     * @param loggerList
+     */
+    constructor(loggerList: Array<Logger>) {
+        this.loggerList = loggerList
+    }
+
+    async log(data: any, level: LogLevels = "INFO") {
+        for (let onePromise of this.loggerList.map((v)=>v.log(data, level))) {
+            await onePromise
+        }
+    }
+
+    async logMessage(req: WXRequest, resWx: WXMessage, handler: WXHandler) {
+        for (let onePromise of this.loggerList.map((v)=>v.logMessage(req, resWx, handler))) {
+            await onePromise
+        }
+    }
+}
