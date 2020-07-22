@@ -172,11 +172,11 @@ export class MongoDBLogger implements Logger {
         let logObj = MessageLogObj(req, resWx, handler, this)
         let obj: any = {
             openId: logObj.openId,
+            user: logObj.userData,
             req: logObj.req,
             handler: logObj.handler,
             res: logObj.res
         }
-        if (logObj.userData) obj.user = logObj.userData
         await this.log(obj, "MESSAGE")
     }
 }

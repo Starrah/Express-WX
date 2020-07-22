@@ -13,6 +13,8 @@ import * as Path from "path";
 import {WithPriority} from "./WXHandler";
 import * as SendRequest from "request-promise"
 import * as RandomString from "randomstring"
+import {WXRequestWithUser} from "./UserProvider";
+import * as Util from "util"
 
 interface _WXRouterBase extends Router {
 }
@@ -86,7 +88,7 @@ class _WXRouterBase implements Router {
             // 建立文件删除监听器，当本文件被删除，自动调用_onDestroy标记本实例为已销毁。
             let myPath = module.path
             await watchRecursively(myPath, (event, filename, type) => {
-                if (type === "fileRemove" && Path.resolve(myPath) === Path.resolve(filename)) {
+                if ((type === "fileRemove" || type === "fileChange") && Path.resolve(myPath) === Path.resolve(filename)) {
                     this._onDestroy()
                 }
             })
@@ -304,7 +306,7 @@ class _WXRouterBase implements Router {
             this.logger.log((_requestByAutoUpdate ? "自动" : "手动") + "刷新ACCESS_TOKEN成功！", "INFO")
             return resObj.access_token
         } catch (e) {
-            this.logger.log((_requestByAutoUpdate ? "自动" : "手动") + "刷新ACCESS_TOKEN失败！ " + e, "WARNING")
+            this.logger.log((_requestByAutoUpdate ? "自动" : "手动") + "刷新ACCESS_TOKEN失败！ " + Util.format(e), "WARNING")
             throw e
         }
     }
@@ -348,7 +350,7 @@ class _WXRouterBase implements Router {
             this.logger.log((_requestByAutoUpdate ? "自动" : "手动") + "刷新JSAPI_TIKET成功！", "INFO")
             return resObj.ticket
         } catch (e) {
-            this.logger.log((_requestByAutoUpdate ? "自动" : "手动") + "刷新JSAPI_TIKET失败！ " + e, "WARNING")
+            this.logger.log((_requestByAutoUpdate ? "自动" : "手动") + "刷新JSAPI_TIKET失败！ " + Util.format(e), "WARNING")
             throw e
         }
     }
