@@ -15,6 +15,7 @@ import * as SendRequest from "request-promise"
 import * as RandomString from "randomstring"
 import {WXRequestWithUser} from "./UserProvider";
 import * as Util from "util"
+import {WXMessage} from "./WXMessage";
 
 interface _WXRouterBase extends Router {
 }
@@ -389,6 +390,116 @@ class _WXRouterBase implements Router {
             nonceStr: param.noncestr,
             signature
         }
+    }
+
+    /**
+     * 发送客服消息给用户。需要在此前的48h内用户和公众号有过互动，详见微信官方文档。
+     *
+     * 如果发送失败，会把一个形如{errcode: 123, errmsg: "xxx"}的对象**以异常的形式抛出来**
+     * @param openId 必填，要发送到的用户的openId
+     * @param message 必填，要发送的消息，WXMessage类的对象
+     * @param kf_account 选填，可以指定发送该消息的客服账号，详见威信官方文档。
+     */
+    async sendCustomMessage(openId: string, message: WXMessage, kf_account?: string) {
+        let json = message.toJson()
+        json.touser = openId
+        if (kf_account) json.customservice = {kf_account}
+        let resObj = await SendRequest.post("https://api.weixin.qq.com/cgi-bin/message/custom/send", {
+            qs: {
+                access_token: this.accessToken,
+            },
+            body: json,
+            json: true
+        })
+        assertWXAPISuccess(resObj)
+    }
+
+    /**
+     * 发送客服消息的输入状态给用户，详见微信官方文档。
+     *
+     * 如果发送失败，会把一个形如{errcode: 123, errmsg: "xxx"}的对象**以异常的形式抛出来**
+     * @param openId 必填，要发送到的用户的openId
+     * @param typing 必填，true表示正在输入、false表示取消正在输入
+     */
+    async sendCustomTypingStatus(openId: string, typing: boolean) {
+        let json = {
+            touser: openId,
+            command: typing ? "Typing" : "CancelTyping"
+        }
+        let resObj = await SendRequest.post("https://api.weixin.qq.com/cgi-bin/message/custom/typing", {
+            qs: {
+                access_token: this.accessToken,
+            },
+            body: json,
+            json: true
+        })
+        assertWXAPISuccess(resObj)
+    }
+
+    /**
+     * 获取该公众号下注册的所有模版。
+     */
+    async getAllTemplates(): Promise<Array<{
+        template_id: string, title: string, primary_industry: string,
+        deputy_industry: string, content: string, example: string,
+        /** 表示模版content中的所有可填入的字段，每一个值"xxx"与模版中一个{{xxx.DATA}}是对应的。微信返回的数据包本来没有这个功能，是本框架提供的。 */
+        data_keys: Array<string>
+    }>> {
+        let resObj = await SendRequest.get("https://api.weixin.qq.com/cgi-bin/template/get_all_private_template", {
+            qs: {
+                access_token: this.accessToken,
+            },
+            json: true
+        })
+        assertWXAPISuccess(resObj)
+        return (resObj.template_list as Array<any>).map((v) => {
+            // noinspection RegExpRedundantEscape
+            let reg = /\{\{(\w+)\.DATA\}\}/g
+            let mat: Array<string>
+            let res: Array<string> = []
+            let content = v.content
+            while (mat = reg.exec(content)) {
+                res.push(mat[1])
+            }
+            v.data_keys = res
+            return v
+        })
+    }
+
+    /**
+     * 发送模版消息给用户。
+     *
+     * 如果发送失败，会把一个形如{errcode: 123, errmsg: "xxx"}的对象**以异常的形式抛出来**
+     * @param openId 必填，要发送到的用户的openId
+     * @param template_id 必填，模版id
+     * @param data 必填，形如{ xxx: "Hello", yyy: {value: "World", color: "#FF0000"} }。
+     * 其中xxx、yyy是模版中的字段，而xxx的取值可以是标准的{value,color}对象，也可以直接是字符串；当是字符串时，会默认取黑色为颜色。
+     * @param jump 选填。可以在此处指定要跳转的url或要跳转的小程序
+     * @return string 消息的msgid
+     */
+    async sendTemplateMessage(openId: string, template_id: string,
+                              data: { [k: string]: string | { value: string, color: string } },
+                              jump?: {url?: string, miniprogram?: { appid: string, pagepath: string }}): Promise<string> {
+        for (let k in data) {
+            if (typeof data[k] === "string") data[k] = {value: data[k] as string, color: "#000000"}
+        }
+        jump = jump || {}
+        let json = {
+            touser: openId,
+            template_id,
+            data,
+            url: jump.url,
+            miniprogram: jump.miniprogram
+        }
+        let resObj = await SendRequest.post("https://api.weixin.qq.com/cgi-bin/message/template/send", {
+            qs: {
+                access_token: this.accessToken,
+            },
+            body: json,
+            json: true
+        })
+        assertWXAPISuccess(resObj)
+        return resObj.msgid
     }
 }
 

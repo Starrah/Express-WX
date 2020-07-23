@@ -128,7 +128,6 @@ It is very welcomed to raise Issues and/or make Pull Requests. Though English do
 
 ## 更新计划
 以下是计划在未来逐步实现的功能（按顺序）。欢迎提交Pull Request！
-- 发送模版消息
 - 素材管理接口  
   
 考虑到即使是个人开发者也已经能十分容易的实现https的现状，微信自带的消息加解密功能暂无支持计划。
