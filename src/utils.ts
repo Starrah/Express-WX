@@ -30,7 +30,7 @@ export function replaceFunctionContent(baseObj: Function, newFunc: Function): Fu
 }
 
 export function xmlGetKey(xml, key: string) {
-    return xml[key]._cdata || xml[key]._text || xml[key]
+    return xml[key] && (xml[key]._cdata || xml[key]._text || xml[key])
 }
 
 export function xmlSetText(xml, key: string, value: string, cdata = false) {

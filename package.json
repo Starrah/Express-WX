@@ -35,6 +35,7 @@
     "express": "^4.17.1",
     "express-router-dynamic": "^1.0.8",
     "mongoose": "^5.9.25",
+    "naming-style": "^1.0.1",
     "randomstring": "^1.1.5",
     "request": "^2.88.2",
     "request-promise": "^4.2.6",

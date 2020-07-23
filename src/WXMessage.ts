@@ -1,39 +1,55 @@
 import {xmlGetKey, xmlSetText} from "./utils";
 import * as request from "request-promise"
+import {pascal} from "naming-style"
 
-export declare type WXMessageType =
-    "text"
-    | "event"
-    | "image"
-    | "voice"
-    | "video"
-    | "shortvideo"
-    | "location"
-    | "link"
-    | "music"
-    | "news"
-    | "noresponse"
+export declare type WXMessageType = "text" | "event" | "image" | "voice" | "video" | "shortvideo" | "location" | "link"
+    | "music" | "news" | "noresponse" | "mpnews" | "msgmenu" | "wxcard" | "miniprogrampage"
 
-export declare type WXMessage =
-    TextWXMessage
-    | EventWXMessage
-    | ImageWXMessage
-    | VoiceWXMessage
-    | VideoWXMessage
-    | ShortVideoWXMessage
-    | LocationWXMessage
-    | LinkWXMessage
-    | MusicWXMessage
-    | NewsWXMessage
-    | NoResponseWXMessage
+export declare type WXMessage = TextWXMessage | EventWXMessage | ImageWXMessage | VoiceWXMessage | VideoWXMessage
+    | ShortVideoWXMessage | LocationWXMessage | LinkWXMessage | MusicWXMessage | NewsWXMessage | NoResponseWXMessage
+    | MPNewsWXMessage | MsgMenuWXMessage | WXCardWXMessage | MiniProgramPageWXMessage
 
 let _registeredWXTypes = {}
 
 /** @decorator */
-export function WXMessageReceiveClass(typeName: string): ClassDecorator {
+export function WXMessageReceiveClass(typeName: string, cannotToXML: boolean = false): ClassDecorator {
     return (target): void => {
-        _registeredWXTypes[typeName] = target
+        if (target.hasOwnProperty("fromXML")) {
+            _registeredWXTypes[typeName] = target
+        } else {
+            target["fromXML"] = function () {
+                throw Error("微信API未定义此种消息类型为可能接收到的消息类型！您很可能是收到了一个不是一个来自微信官方的请求。")
+            }
+        }
+        if (!target.prototype.hasOwnProperty("toJson")) target.prototype.toJson = function () {
+            throw Error("微信API未提供向用户发送此类型的消息的方法！")
+        }
+        if (cannotToXML) target.prototype.toXML = function () {
+            throw Error("该类型的消息不能被回复给用户，只能通过客服消息发送！")
+        }
     };
+}
+
+let _wxJsonToXmlKeyAdapter = {
+    musicurl: "MusicUrl",
+    hqmusicurl: "HQMusicUrl",
+    picurl: "PicUrl"
+}
+
+function addJSONtoXML(xml, json) {
+    for (let k in json) {
+        if (k === "touser" || k === "msgtype") continue
+        let v = json[k]
+        let type = typeof v
+        let parsedKey = _wxJsonToXmlKeyAdapter[k] || pascal(k)
+        if (type === "string" || type === "boolean" || type === "number") xmlSetText(xml, parsedKey, v, true)
+        else if (type === "object") {
+            if (v instanceof Array) {
+                xml[parsedKey] = {item: v.map((o) => addJSONtoXML({}, o))}
+            } else xml[parsedKey] = addJSONtoXML({}, v)
+        }
+    }
+    return xml
 }
 
 export class WXMessageBasicPart {
@@ -56,22 +72,33 @@ export class WXMessageBasicPart {
         this.CreateTime = new Date()
     }
 
-    static fromXML(xml): WXMessageBasicPart {
-        let ins = new WXMessageBasicPart(null)
-        ins.type = xmlGetKey(xml, "MsgType")
-        ins.openId = xmlGetKey(xml, "FromUserName")
-        ins.CreateTime = new Date(Number(xmlGetKey(xml, "CreateTime")) * 1000)
-        ins.MsgId = xmlGetKey(xml, "MsgId")
-        return ins
+    addBasicPartToXML(xml) {
+        this.type = xmlGetKey(xml, "MsgType")
+        this.openId = xmlGetKey(xml, "FromUserName")
+        this.CreateTime = new Date(Number(xmlGetKey(xml, "CreateTime")) * 1000)
+        this.MsgId = xmlGetKey(xml, "MsgId")
+        return this
     }
 
-    toXML(xml?) {
-        // 在消息转xml阶段，是不加入ToUserName信息的，由内置中间件在之后根据req中提供的信息加入进来。
-        // 而如果openId已经指定，则会自动填入FromUserName；否则会留空FromUserName，之后由WXRouter上的逻辑手动填入。
-        xml = xml || {}
+    static fromXML(xml): WXMessageBasicPart {
+        return new WXMessageBasicPart(null).addBasicPartToXML(xml)
+    }
+
+    toJson(): any {
+        return {
+            touser: this.openId,
+            msgtype: this.type
+        }
+    }
+
+    toXML(): any {
+        // 在消息转xml阶段，是不加入FromUserName信息的，由内置中间件在之后根据req中提供的信息加入进来。
+        // 而如果openId已经指定，则会自动填入ToUserName；否则会留空ToUserName，之后由WXRouter上的逻辑手动填入。
+        let xml = {}
         xmlSetText(xml, "MsgType", this.type, true)
         xmlSetText(xml, "CreateTime", String(Math.round(this.CreateTime.getTime() / 1000)))
         xmlSetText(xml, "ToUserName", this.openId, true)
+        addJSONtoXML(xml, this.toJson())
         return xml
     }
 
@@ -89,6 +116,8 @@ export class TextWXMessage extends WXMessageBasicPart {
     type: WXMessageType = "text"
     /** 文本消息的内容字段 (Content) */
     text: string
+    /** 仅在该消息是服务消息发送的可点击菜单的点击事件产生的消息时才会有此字段，是按钮的id。详见微信官方文档。 */
+    bizmsgmenuid?: string
 
     constructor(text: string) {
         super("text");
@@ -96,20 +125,27 @@ export class TextWXMessage extends WXMessageBasicPart {
     }
 
     static fromXML(xml): TextWXMessage {
-        let base = WXMessageBasicPart.fromXML(xml)
-        let ins = new TextWXMessage(xmlGetKey(xml, "Content"))
-        Object.assign(ins, base)
+        let ins = new TextWXMessage(xmlGetKey(xml, "Content")).addBasicPartToXML(xml)
+        ins.bizmsgmenuid = xmlGetKey(xml, "bizmsgmenuid")
         return ins
     }
 
-    toXML(xml?) {
-        xml = super.toXML()
-        xmlSetText(xml, "Content", this.text, true)
+    toJson() {
+        let s = super.toJson()
+        s.text = {content: this.text}
+        return s
+    }
+
+    toXML() {
+        let xml = super.toXML()
+        xml.Content = xml.Text.Content
+        delete xml.Text
         return xml
     }
 
     toLog(): any {
-        return this.text
+        if (!this.bizmsgmenuid) return this.text
+        else return super.toLog()
     }
 }
 
@@ -123,7 +159,7 @@ export interface PositionOfEventWXMessage {
 export class EventWXMessage extends WXMessageBasicPart {
     type: WXMessageType = "event"
     /** 事件消息的Event字段。详请阅读微信官方文档。 */
-    event: "subscribe" | "ubsubscribe" | "SCAN" | "LOCATION" | "CLICK" | "VIEW"
+    event: "subscribe" | "ubsubscribe" | "SCAN" | "LOCATION" | "CLICK" | "VIEW" | "TEMPLATESENDJOBFINISH"
 
     /** 事件消息的EventKey字段。（扫描带参二维码、自定义菜单事件携带。）详请阅读微信官方文档。 */
     EventKey?: string
@@ -133,13 +169,15 @@ export class EventWXMessage extends WXMessageBasicPart {
     /** 上报地理位置事件的与地理位置有关的字段。详请阅读微信官方文档。 */
     positionInfo?: PositionOfEventWXMessage
 
+    /** 发送模版消息结果。详请阅读微信官方文档。*/
+    Status: string
+
     constructor() {
         super("event");
     }
 
     static fromXML(xml): EventWXMessage {
-        let base = WXMessageBasicPart.fromXML(xml)
-        let ins = new EventWXMessage()
+        let ins = new EventWXMessage().addBasicPartToXML(xml)
         ins.event = xmlGetKey(xml, "Event")
         ins.EventKey = xmlGetKey(xml, "EventKey")
         if (ins.event === "subscribe" || ins.event === "SCAN") ins.Ticket = xmlGetKey(xml, "Ticket")
@@ -148,12 +186,8 @@ export class EventWXMessage extends WXMessageBasicPart {
             Longitude: xmlGetKey(xml, "Longitude"),
             Precision: xmlGetKey(xml, "Precision")
         }
-        Object.assign(ins, base)
+        if (ins.event === "TEMPLATESENDJOBFINISH") ins.Status = xmlGetKey(xml, "Status")
         return ins
-    }
-
-    toXML(xml?) {
-        throw Error("微信API未提供回复此类型的消息的方法！")
     }
 }
 
@@ -173,22 +207,20 @@ export class ImageWXMessage extends WXMessageBasicPart {
     }
 
     static fromXML(xml): ImageWXMessage {
-        let base = WXMessageBasicPart.fromXML(xml)
-        let ins = new ImageWXMessage(xmlGetKey(xml, "MediaId"))
+        let ins = new ImageWXMessage(xmlGetKey(xml, "MediaId")).addBasicPartToXML(xml)
         ins.PicUrl = xmlGetKey(xml, "PicUrl")
-        Object.assign(ins, base)
         return ins
     }
 
-    toXML(xml?) {
-        xml = super.toXML()
-        xml["Image"] = xmlSetText({}, "MediaId", this.MediaId, true)
-        return xml
+    toJson() {
+        let s = super.toJson()
+        s.image = {"media_id": this.MediaId}
+        return s
     }
 
     async requestBytes(): Promise<Buffer> {
         if (!this.PicUrl) return null
-        return await request(this.PicUrl, {
+        return request(this.PicUrl, {
             method: "GET",
             timeout: 3000,
             encoding: null,
@@ -213,18 +245,16 @@ export class VoiceWXMessage extends WXMessageBasicPart {
     }
 
     static fromXML(xml): VoiceWXMessage {
-        let base = WXMessageBasicPart.fromXML(xml)
-        let ins = new VoiceWXMessage(xmlGetKey(xml, "MediaId"))
+        let ins = new VoiceWXMessage(xmlGetKey(xml, "MediaId")).addBasicPartToXML(xml)
         ins.Format = xmlGetKey(xml, "Format")
         ins.Recognition = xmlGetKey(xml, "Recognition")
-        Object.assign(ins, base)
         return ins
     }
 
-    toXML(xml?) {
-        xml = super.toXML()
-        xml["Voice"] = xmlSetText({}, "MediaId", this.MediaId, true)
-        return xml
+    toJson() {
+        let s = super.toJson()
+        s.voice = {media_id: this.MediaId}
+        return s
     }
 
     async requestBytes(): Promise<Buffer> {
@@ -253,21 +283,20 @@ export class VideoWXMessage extends WXMessageBasicPart {
     }
 
     static fromXML(xml): VideoWXMessage {
-        let base = WXMessageBasicPart.fromXML(xml)
-        let ins = new VideoWXMessage(xmlGetKey(xml, "MediaId"))
+        let ins = new VideoWXMessage(xmlGetKey(xml, "MediaId")).addBasicPartToXML(xml)
         ins.ThumbMediaId = xmlGetKey(xml, "ThumbMediaId")
-        Object.assign(ins, base)
         return ins
     }
 
-    toXML(xml?) {
-        xml = super.toXML()
-        let i = {}
-        xmlSetText(i, "MediaId", this.MediaId, true)
-        xmlSetText(i, "Title", this.title, true)
-        xmlSetText(i, "Description", this.description, true)
-        xml["Video"] = i
-        return xml
+    toJson() {
+        let s = super.toJson()
+        s.video = {
+            media_id: this.MediaId,
+            thumb_media_id: this.ThumbMediaId,
+            title: this.title,
+            description: this.description
+        }
+        return s
     }
 
     async requestBytes(): Promise<Buffer> {
@@ -292,16 +321,10 @@ export class ShortVideoWXMessage extends WXMessageBasicPart {
     }
 
     static fromXML(xml): ShortVideoWXMessage {
-        let base = WXMessageBasicPart.fromXML(xml)
-        let ins = new ShortVideoWXMessage()
+        let ins = new ShortVideoWXMessage().addBasicPartToXML(xml)
         ins.MediaId = xmlGetKey(xml, "MediaId")
         ins.ThumbMediaId = xmlGetKey(xml, "ThumbMediaId")
-        Object.assign(ins, base)
         return ins
-    }
-
-    toXML(xml?) {
-        throw Error("微信API未提供回复此类型的消息的方法！")
     }
 
     async requestBytes(): Promise<Buffer> {
@@ -330,18 +353,12 @@ export class LocationWXMessage extends WXMessageBasicPart {
     }
 
     static fromXML(xml): LocationWXMessage {
-        let base = WXMessageBasicPart.fromXML(xml)
-        let ins = new LocationWXMessage()
+        let ins = new LocationWXMessage().addBasicPartToXML(xml)
         ins.x = xmlGetKey(xml, "Location_X")
         ins.y = xmlGetKey(xml, "Location_Y")
         ins.scale = xmlGetKey(xml, "Scale")
         ins.label = xmlGetKey(xml, "Label")
-        Object.assign(ins, base)
         return ins
-    }
-
-    toXML(xml?) {
-        throw Error("微信API未提供回复此类型的消息的方法！")
     }
 }
 
@@ -360,21 +377,16 @@ export class LinkWXMessage extends WXMessageBasicPart {
     }
 
     static fromXML(xml): LinkWXMessage {
-        let base = WXMessageBasicPart.fromXML(xml)
-        let ins = new LinkWXMessage()
+        let ins = new LinkWXMessage().addBasicPartToXML(xml)
         ins.url = xmlGetKey(xml, "Url")
         ins.title = xmlGetKey(xml, "Title")
         ins.description = xmlGetKey(xml, "Description")
-        Object.assign(ins, base)
         return ins
-    }
-
-    toXML(xml?) {
-        throw Error("微信API未提供回复此类型的消息的方法！")
     }
 }
 
 /** 此消息类型只会作为回复类型，不会出现在收到的消息中。 */
+@WXMessageReceiveClass("music")
 export class MusicWXMessage extends WXMessageBasicPart {
     type: WXMessageType = "music"
     /** 音乐的MusicURL。详请阅读微信官方文档。 */
@@ -397,16 +409,16 @@ export class MusicWXMessage extends WXMessageBasicPart {
         this.description = description
     }
 
-    toXML(xml?) {
-        xml = super.toXML()
-        let i = {}
-        xmlSetText(i, "MusicURL", this.MusicURL, true)
-        xmlSetText(i, "HQMusicURL", this.HQMusicURL, true)
-        xmlSetText(i, "ThumbMediaId", this.ThumbMediaId, true)
-        xmlSetText(i, "Title", this.title, true)
-        xmlSetText(i, "Description", this.description, true)
-        xml["Music"] = i
-        return xml
+    toJson() {
+        let s = super.toJson()
+        s.music = {
+            title: this.title,
+            description: this.description,
+            musicurl: this.MusicURL,
+            hqmusicurl: this.HQMusicURL,
+            thumb_media_id: this.ThumbMediaId
+        }
+        return s
     }
 }
 
@@ -414,7 +426,7 @@ export interface NewsWXMessageItem {
     /** 图文的Url。详请阅读微信官方文档。 */
     url: string
     /** 图文的PicUrl。详请阅读微信官方文档。 */
-    PicUrl: string
+    picurl: string
     /** 图文的Title。详请阅读微信官方文档。 */
     title: string
     /** 图文的Description。详请阅读微信官方文档。 */
@@ -422,6 +434,7 @@ export interface NewsWXMessageItem {
 }
 
 /** 图文消息类型。此消息类型只会作为回复类型，不会出现在收到的消息中。 */
+@WXMessageReceiveClass("news")
 export class NewsWXMessage extends WXMessageBasicPart {
     type: WXMessageType = "news"
     articles: Array<NewsWXMessageItem>
@@ -431,18 +444,12 @@ export class NewsWXMessage extends WXMessageBasicPart {
         this.articles = articles
     }
 
-    toXML(xml?) {
-        xml = super.toXML()
-        let arr = this.articles.map(v => {
-            let i = {}
-            xmlSetText(i, "Url", v.url, true)
-            xmlSetText(i, "PicUrl", v.PicUrl, true)
-            xmlSetText(i, "Title", v.title, true)
-            xmlSetText(i, "Description", v.description, true)
-            return i
-        })
-        xml["Articles"] = {item: arr}
-        return xml
+    toJson() {
+        let s = super.toJson()
+        s.news = {
+            articles: this.articles
+        }
+        return s
     }
 }
 
@@ -463,11 +470,111 @@ export class NoResponseWXMessage extends WXMessageBasicPart {
     }
 }
 
+/** 图文消息类型。此消息类型只会作为**客服消息**的回复类型，不会出现在收到的消息中、也不能通过被动回复返回给用户。 */
+@WXMessageReceiveClass("mpnews", true)
+export class MPNewsWXMessage extends WXMessageBasicPart {
+    type: WXMessageType = "mpnews"
+    /** 微信图文消息的MediaId。详请阅读微信官方文档。 */
+    MediaId: string
+
+    constructor(MediaId: string) {
+        super("mpnews");
+        this.MediaId = MediaId
+    }
+
+    toJson() {
+        let s = super.toJson()
+        s.mpnews = {media_id: this.MediaId}
+        return s
+    }
+}
+
+/** 图文消息类型。此消息类型只会作为**客服消息**的回复类型，不会出现在收到的消息中、也不能通过被动回复返回给用户。 */
+@WXMessageReceiveClass("msgmenu", true)
+export class MsgMenuWXMessage extends WXMessageBasicPart {
+    type: WXMessageType = "msgmenu"
+    /** 菜单消息的标题 */
+    head_content: string
+    /** 可点击的按钮的定义。数组中的每个元素表示一个按钮，content是按钮的文字，
+     *  而id是按钮的id、会在TextWXMessage的bizmsgmenuid字段返回。 详见微信官方文档。*/
+    list: Array<{ id: string, content: string }>
+    /** 菜单消息的尾部文字 */
+    tail_content: string
+
+    constructor(head_content: string, list: Array<{ id: string, content: string }>, tail_content?: string) {
+        super("msgmenu");
+        this.head_content = head_content
+        this.list = list
+        this.tail_content = tail_content
+    }
+
+    toJson() {
+        let s = super.toJson()
+        s.msgmenu = {
+            head_content: this.head_content,
+            list: this.list,
+            tail_content: this.tail_content
+        }
+        return s
+    }
+}
+
+/** 图文消息类型。此消息类型只会作为**客服消息**的回复类型，不会出现在收到的消息中、也不能通过被动回复返回给用户。 */
+@WXMessageReceiveClass("wxcard", true)
+export class WXCardWXMessage extends WXMessageBasicPart {
+    type: WXMessageType = "wxcard"
+    /** 微信图文消息的MediaId。详请阅读微信官方文档。 */
+    card_id: string
+
+    constructor(card_id: string) {
+        super("wxcard");
+        this.card_id = card_id
+    }
+
+    toJson() {
+        let s = super.toJson()
+        s.wxcard = {card_id: this.card_id}
+        return s
+    }
+}
+
+/** 图文消息类型。此消息类型只会作为**客服消息**的回复类型，不会出现在收到的消息中、也不能通过被动回复返回给用户。 */
+@WXMessageReceiveClass("miniprogrampage", true)
+export class MiniProgramPageWXMessage extends WXMessageBasicPart {
+    type: WXMessageType = "mpnews"
+    /** 详见微信官方文档 */
+    title: string
+    /** 详见微信官方文档 */
+    appid: string
+    /** 详见微信官方文档 */
+    pagepath: string
+    /** 详见微信官方文档 */
+    thumb_media_id: string
+
+    constructor(titie: string, appid: string, pagepath: string, thumb_media_id: string) {
+        super("mpnews");
+        this.title = titie
+        this.appid = appid
+        this.pagepath = pagepath
+        this.thumb_media_id = thumb_media_id
+    }
+
+    toJson() {
+        let s = super.toJson()
+        s.miniprogrampage = {
+            title: this.title,
+            appid: this.appid,
+            pagepath: this.pagepath,
+            thumb_media_id: this.thumb_media_id
+        }
+        return s
+    }
+}
+
 export function parseMessageXml(xml): WXMessage {
     let type = xmlGetKey(xml, "MsgType")
     let cls = _registeredWXTypes[type]
     if (!cls) throw Error("收到了不支持的消息类型！")
     return cls.fromXML(xml)
 }
-
 
