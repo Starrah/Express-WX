@@ -112,6 +112,47 @@ export default handler
 通过在WXRouter的构造函数传入config，可以实现更多的功能。  
 请看[这里](./src/config.ts)查看更多的配置项参考。  
 
+## 其他功能
+- 用户管理：可以通过对配置项的userProvider函数传入一个(openId: string)=>any类型的函数实现在req上附加user字段、从而在处理逻辑里迅速获知user信息
+- 内置WXAPIUserProvider实现，可以直接利用微信官方的API迅速获知用户信息
+```typescript
+import {WXRouter, WXAPIUserProvider} from "express-wx";
+app.use(WXRouter({
+    appInfo: {/*...*/},
+    userProvider: WXAPIUserProvider()
+}))
+```
+- 日志记录：可以记录到控制台、文件、MongoDB
+```typescript
+import {WXRouter, FileOrConsoleLogger, MongoDBLogger} from "express-wx";
+app.use(WXRouter({
+    appInfo: {/*...*/},
+    logger: new FileOrConsoleLogger("logs/log.txt"), // 不传参则为记录到控制台，传参则为记录到指定路径的文件
+    messageLogger: new MongoDBLogger("mongodb://localhost:27017/testApp", "testApp") // 记录收到的消息的内容到指定MongoDB的"testApp"collection
+}))
+```
+- 发送客服消息、模版消息
+```typescript
+import {WXRouter, TextWXMessage} from "express-wx"; 
+let wxRouter = WXRouter({
+    appInfo: {/*...*/},
+})
+wxRouter.sendCustomMessage("openId", new TextWXMessage("Hello World")) // 发送客服消息
+wxRouter.sendCustomTypingStatus("openId", true) // 下发输入状态
+
+console.log(await wxRouter.getAllTemplates()) // 获取所有的添加到公众号的模版信息
+await wxRouter.sendTemplateMessage("openId", "template_id", {xxx: "Hello", yyy: {value: "World", "color": "#FF0000"}}, {url: "http://xxx"}) // 发送模版消息
+```
+- JSAPI签名
+```typescript
+import {WXRouter, TextWXMessage} from "express-wx"; 
+let wxRouter = WXRouter({
+    appInfo: {/*...*/},
+    enableJSAPI: true
+})
+wxRouter.signJSAPI({url: "http://xxx"}) // 内含signature、appid、timestamp、noncestr等字段，直接发回给前端用作wx.config的参数即可。
+```
+
 ## Issue/Pull Request大欢迎！
 欢迎提出Issue反馈问题、建议、意见，欢迎发起Pull Request完善本程序。  
 由于项目尚处于初期阶段，对现有代码的测试尚不完善，因此暂不强制要求您的实现新特性的PR应当编写对新特性的测试。（当然，现有的数量有限的基础测试还是需要通过的，这个会由CI自动完成）  
