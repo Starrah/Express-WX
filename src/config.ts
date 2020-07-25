@@ -91,6 +91,11 @@ export interface WXRouterConfig {
     enableJSAPI?: boolean
 
     /**
+     * 定时刷新ACCESS_TOKEN的周期，单位为ms。默认为5400000，即每90分钟刷新一次。
+     */
+    accessTokenUpdateInterval?: number
+
+    /**
      * 此配置项需要传入一个UserProvider的实例，即一个可以根据openId产生用户信息的函数。可以是异步函数。
      * 详见UserProvider的注释（见UserProvider.d.ts）
      *
@@ -153,6 +158,7 @@ const defaultConfig: WXRouterConfig = {
     messageLogger: null,
     enbaleAcccesToken: true,
     enableJSAPI: false,
+    accessTokenUpdateInterval: 5400000,
     userProvider: undefined,
     debugToken: undefined,
     finalResponseText: undefined,

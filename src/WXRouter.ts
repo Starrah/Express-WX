@@ -16,6 +16,7 @@ import * as RandomString from "randomstring"
 import {WXRequestWithUser} from "./UserProvider";
 import * as Util from "util"
 import {WXMessage} from "./WXMessage";
+import * as _ from "lodash"
 
 interface _WXRouterBase extends Router {
 }
@@ -102,9 +103,10 @@ class _WXRouterBase implements Router {
             this._handlerMap = initDynamics
 
             // 建立定时任务和accessToken初次获取
-            // 无论何种情况（是否开启enbaleAccessToken、是否配置APPID），都一定会建立每10分钟刷新accessToken的定时任务。
+            // 无论何种情况（是否开启enbaleAccessToken、是否配置APPID），都一定会建立刷新accessToken的定时任务。
             // 这是为了防止用户在代码的其他地方运行时修改config和appInfo，我们的逻辑也能正常工作。
-            const TRY_UPDATE_CALL_INTERVAL = 600000;
+            // 定时任务的周期，取设置的刷新ACCESS_TOKEN周期除以5并clamp在[30s, 600s]之内的值。
+            const TRY_UPDATE_CALL_INTERVAL = _.clamp(Math.round(this.config.accessTokenUpdateInterval / 5), 30000, 600000);
             // noinspection ES6MissingAwait
             (async () => {
                 while (!this.destroyed) { // 只要WXRouter没被摧毁，就一直运行
@@ -330,7 +332,8 @@ class _WXRouterBase implements Router {
      * @private
      */
     private async _tryUpdateAccessTokenIfNecessary(): Promise<string> {
-        const AUTO_UPDATE_ACCESS_TOKEN_INTERVAL = 5400000 // 默认每1h30min就会自动刷新access_token
+        // 刷新周期从配置项中读取（默认配置是每1h30min自动刷新access_token）
+        const AUTO_UPDATE_ACCESS_TOKEN_INTERVAL = this.config.accessTokenUpdateInterval
         try {
             this._assertAccessTokenAvailable()
             // @ts-ignore
