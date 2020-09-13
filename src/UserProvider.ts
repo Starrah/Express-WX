@@ -10,6 +10,8 @@ export interface LoggableUser {
     toLogData?(loggerInstance: Logger): any
 }
 
+export declare type ToLogDataFuncOfLoggableUser<T> = (this: T & LoggableUser, loggerInstance: Logger) => any
+
 interface WithUser<T> {
     user?: T
 }
@@ -59,7 +61,7 @@ interface WXAPIUser extends LoggableUser {
  * @param toLogData 选填。可以传入函数用于把用户的数据对象变换为可日志记录的格式。默认为：对MongoDBLogger记录昵称、性别、省份、unionid、remark；其余种类的Logger的则只记录昵称字符串。
  * @constructor
  */
-export function WXAPIUserProvider(userInfoCacheTimeMs: number = 7200000, toLogData?: (loggerInstance: Logger) => any): UserProvider {
+export function WXAPIUserProvider(userInfoCacheTimeMs: number = 7200000, toLogData?: ToLogDataFuncOfLoggableUser<WXAPIUser>): UserProvider {
     let resFunc: ((openId: string) => Promise<WXAPIUser>) & { cache: { [k: string]: { user: WXAPIUser, date: Date } }, cacheTime: number }
     // @ts-ignore
     resFunc = async function (openId: string): WXAPIUser {
@@ -105,7 +107,7 @@ export function WXAPIUserProvider(userInfoCacheTimeMs: number = 7200000, toLogDa
  * @param option 选项配置。其中dbName表示使用的database名字（不填则默认为uri中指定的那个database）。
  * 而connectionOption的内容是直接原样传给mongoose.createConnection的。
  */
-export function MongoDBUserProvider<T>(mongoUri: string, schema: Schema, toLogData: (loggerInstance: Logger) => any, option?: {
+export function MongoDBUserProvider<T>(mongoUri: string, schema: Schema, toLogData: ToLogDataFuncOfLoggableUser<T>, option?: {
     dbName?: string,
     connectionOption?: Mongoose.ConnectionOptions,
     openIdFieldName?: string
