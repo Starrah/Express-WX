@@ -8,6 +8,7 @@ import {LoggableUser, WXRequestWithUser} from "./UserProvider";
 import * as Util from "util"
 import * as Mongoose from "mongoose"
 import {WXRequest} from "./WXRequest";
+import {runCatching} from "./utils";
 
 const Mixed = Mongoose.Schema.Types.Mixed
 
@@ -88,6 +89,10 @@ export class FileOrConsoleLogger implements Logger {
     }
 
     async log(data: any, level: LogLevels = "INFO") {
+        // 把data转为string
+        if (typeof data !== "string") data = runCatching(() => JSON.stringify(data), data)
+        if (typeof data !== "string") data = String(data)
+
         if (this.toConsole) {
             if (level === "ERROR" || level === "WARNING") {
                 console.error(this._prefix(level) + data)
@@ -101,7 +106,7 @@ export class FileOrConsoleLogger implements Logger {
 
     async logMessage(req: WXRequest, resWx: WXMessage, handler: WXHandler) {
         let logObj = MessageLogObj(req, resWx, handler, this)
-        let userStr = logObj.userData? `(${logObj.userData})` : ""
+        let userStr = logObj.userData ? `(${logObj.userData})` : ""
         let logStr = `${Chalk.underline(logObj.openId + userStr)}: ${Util.inspect(logObj.req)} --> ${Util.inspect(logObj.res)}`
         await this.log(logStr, "MESSAGE")
     }
@@ -155,13 +160,15 @@ export class MongoDBLogger implements Logger {
 
         // 连接和model构建
         let pendingConnection = Mongoose.createConnection(mongoUri, option.connectionOption)
-        pendingConnection.then(()=>{this.valid = true})
+        pendingConnection.then(() => {
+            this.valid = true
+        })
         this.connection = pendingConnection
         this.model = this.connection.model(collection, schema, collection)
     }
 
     async log(data: any, level: LogLevels = "INFO") {
-        if (typeof data === "function") data = data.name
+        if (typeof data === "function") data = {$function: data.toString()}
         if (typeof data !== "object") data = {content: data}
         data.level = level
         let modelObj = new this.model(data)
@@ -195,13 +202,13 @@ export class WrapManyLogger implements Logger {
     }
 
     async log(data: any, level: LogLevels = "INFO") {
-        for (let onePromise of this.loggerList.map((v)=>v.log(data, level))) {
+        for (let onePromise of this.loggerList.map((v) => v.log(data, level))) {
             await onePromise
         }
     }
 
     async logMessage(req: WXRequest, resWx: WXMessage, handler: WXHandler) {
-        for (let onePromise of this.loggerList.map((v)=>v.logMessage(req, resWx, handler))) {
+        for (let onePromise of this.loggerList.map((v) => v.logMessage(req, resWx, handler))) {
             await onePromise
         }
     }

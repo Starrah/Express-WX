@@ -153,6 +153,7 @@ class _WXRouterBase implements Router {
                     reo.res.wxText(this.config.finalResponseText)
                 } else reo.res.wxNoResp()
             } else {
+                if (err) this.logger.log(err.stack || err, "ERROR")
                 reo.next(err)
             }
             return
@@ -320,7 +321,7 @@ class _WXRouterBase implements Router {
             this.logger.log((_requestByAutoUpdate ? "自动" : "手动") + "刷新ACCESS_TOKEN成功！", "INFO")
             return resObj.access_token
         } catch (e) {
-            this.logger.log((_requestByAutoUpdate ? "自动" : "手动") + "刷新ACCESS_TOKEN失败！ " + Util.format(e), "WARNING")
+            this.logger.log((_requestByAutoUpdate ? "自动" : "手动") + "刷新ACCESS_TOKEN失败！ " + Util.format(e), "ERROR")
             throw e
         }
     }
@@ -365,7 +366,7 @@ class _WXRouterBase implements Router {
             this.logger.log((_requestByAutoUpdate ? "自动" : "手动") + "刷新JSAPI_TIKET成功！", "INFO")
             return resObj.ticket
         } catch (e) {
-            this.logger.log((_requestByAutoUpdate ? "自动" : "手动") + "刷新JSAPI_TIKET失败！ " + Util.format(e), "WARNING")
+            this.logger.log((_requestByAutoUpdate ? "自动" : "手动") + "刷新JSAPI_TIKET失败！ " + Util.format(e), "ERROR")
             throw e
         }
     }
@@ -482,7 +483,7 @@ class _WXRouterBase implements Router {
      */
     async sendTemplateMessage(openId: string, template_id: string,
                               data: { [k: string]: string | { value: string, color: string } },
-                              jump?: {url?: string, miniprogram?: { appid: string, pagepath: string }}): Promise<string> {
+                              jump?: { url?: string, miniprogram?: { appid: string, pagepath: string } }): Promise<string> {
         for (let k in data) {
             if (typeof data[k] === "string") data[k] = {value: data[k] as string, color: "#000000"}
         }

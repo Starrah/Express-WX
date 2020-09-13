@@ -1,6 +1,6 @@
 {
   "name": "express-wx",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Express Router for building Wechat Offical Account Message Server easily, supporting loading request (message) handlers dynamically. 快速构建微信公众号消息后端，支持动态加载请求处理逻辑代码。",
   "main": "bld/index.js",
   "scripts": {

@@ -2,7 +2,7 @@ export function findRootProto(a: any, baseProto: any): any {
     let type = typeof a
     if (type === "object") {
         let proto = a.__proto__
-        if (!proto || proto === baseProto ||proto === Object.prototype) return a
+        if (!proto || proto === baseProto || proto === Object.prototype) return a
     } else if (type === "function") {
         let proto = a.__proto__
         if (!proto || proto === baseProto || proto === Function.prototype) return a
@@ -10,7 +10,7 @@ export function findRootProto(a: any, baseProto: any): any {
     return findRootProto(a.__proto__, baseProto)
 }
 
-export function extendPrototype<T>(baseObj: any, objWithNewProto: T): T{
+export function extendPrototype<T>(baseObj: any, objWithNewProto: T): T {
     let baseProto = baseObj.__proto__
     let newRootProto = findRootProto(objWithNewProto, baseProto)
     Object.assign(objWithNewProto, baseObj)
@@ -44,6 +44,10 @@ export function assertWXAPISuccess(resObj: any) {
     if (!resObj || resObj.errcode) throw resObj
 }
 
+export function isPromiseLike(o) {
+    return o && (typeof o === "object" || typeof o === "function") && typeof o.then === "function"
+}
+
 /**
  * 把一个可能抛出异常的assert形式函数，转化为一个不会抛出异常、只会返回true或false的check形式函数
  * （当然返回值也可能是包装了true或false的PromiseLike，如果传入的fn本身是异步函数的话）。
@@ -55,12 +59,21 @@ export function checkify(fn: Function) {
     return function (...args): boolean {
         try {
             let res = fn.call(this, ...args)
-            if (!(res && res.then && res.catch)) { // 如果不是PromiseLike
-                return true
-            }
-            else return res.then(()=>true).catch(()=>false)
+            if (!isPromiseLike(res)) return true // 如果不是PromiseLike
+            else return res.then(() => true).catch(() => false)
         } catch (e) {
             return false
         }
+    }
+}
+
+/** 执行参数中传入的函数。如果该函数正常返回（含异步返回），则直接返回该函数返回的值，否则返回valueOnError（默认为undefined）。*/
+export function runCatching(f: () => any, valueOnError = undefined) {
+    try {
+        let r = f()
+        if (isPromiseLike(r)) r = r.then(undefined, () => valueOnError)
+        return r
+    } catch (e) {
+        return valueOnError
     }
 }

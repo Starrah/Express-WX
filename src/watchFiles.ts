@@ -74,7 +74,7 @@ export async function watchRecursively(path: string, extraCallback?: FsWatchCall
 /**
  * 加载动态路由。path可以是目录也可以是文件名，目录的话就会递归加载，文件名就是只加载一个、返回只有一个元素的对象。
  */
-export async function loadRouter(path): Promise<{[k: string]: RequestHandler}> {
+export async function loadRouter(path): Promise<{ [k: string]: RequestHandler }> {
     path = Path.resolve(path)
     let stat
     try {
@@ -121,12 +121,11 @@ export function generateOnChangeCb(wxRouter: WXRouter): FsWatchCallback {
         if (type === "dirAdd" || type === "fileAdd" || type === "fileChange") {
             let newRouters = await loadRouter(filename)
             wxRouter._handlerMap = Object.assign(wxRouter._handlerMap, newRouters)
-        }
-        else if (type === "fileRemove") {
+        } else if (type === "fileRemove") {
             let old = wxRouter._handlerMap
             delete old[filename]
             wxRouter._handlerMap = old
-        }else if(type === "dirRemove") {
+        } else if (type === "dirRemove") {
             let old = wxRouter._handlerMap
             for (let key in old) {
                 if (Path.relative(filename, key).indexOf("..") !== 0) {

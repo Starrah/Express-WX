@@ -7,7 +7,7 @@ export interface WXRequest extends Request {
 
 }
 
-export class WXRequest implements Request{
+export class WXRequest implements Request {
     constructor(baseObj: Request, wx: WXMessage, wxRouter: WXRouter) {
         extendPrototype(baseObj, this)
         // @ts-ignore

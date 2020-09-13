@@ -26,7 +26,7 @@ export interface WXRouterConfig {
      * 可以直接传入一个WXAPPInfo对象，也可传入一个能返回WXAPPInfo的普通函数或异步函数。
      * @see WXAPPInfo
      */
-    appInfo: WXAPPInfo | {(): WXAPPInfo | Promise<WXAPPInfo>}
+    appInfo: WXAPPInfo | { (): WXAPPInfo | Promise<WXAPPInfo> }
 
     /**
      * 动态加载请求处理器的目录路径。默认为"./handlers"。
