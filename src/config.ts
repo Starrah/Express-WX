@@ -78,7 +78,7 @@ export interface WXRouterConfig {
      * 注意：如果appInfo中没有给出APPID和APPSECRET，则本项设置为true也是没用的；注意记得成功获取ACCESS_TOKEN
      * 必须需要在微信公众平台设置白名单。
      */
-    enbaleAcccesToken?: boolean
+    enableAccessToken?: boolean
 
     /**
      * 是否开启JSAPI签名功能。默认为false。
@@ -156,7 +156,7 @@ const defaultConfig: WXRouterConfig = {
     staticHandlers: [],
     logger: new FileOrConsoleLogger(),
     messageLogger: null,
-    enbaleAcccesToken: true,
+    enableAccessToken: true,
     enableJSAPI: false,
     accessTokenUpdateInterval: 5400000,
     userProvider: undefined,

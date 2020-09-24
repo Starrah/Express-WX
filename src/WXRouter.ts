@@ -277,7 +277,7 @@ class _WXRouterBase implements Router {
     }
 
     private _assertAccessTokenAvailable() {
-        if (!this.config.enbaleAcccesToken) throw Error("config中没有开启enableAccessToken配置项，因而无法获取accessToken！")
+        if (!this.config.enableAccessToken) throw Error("config中没有开启enableAccessToken配置项，因而无法获取accessToken！")
         else if (!(this.appInfo.token && this.appInfo.APPID && this.appInfo.APPSECRET)) throw Error("config中没有配置合法的APPID和APPSECRET，因而无法获取accessToken！")
     }
 
