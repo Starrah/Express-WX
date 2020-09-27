@@ -1,6 +1,7 @@
 Express-WX
 ===================
 [![NPM Package](https://badge.fury.io/js/express-wx.svg)](https://www.npmjs.com/package/express-wx)
+[![Downloads](https://img.shields.io/npm/dt/express-wx)](https://www.npmjs.com/package/express-wx)
 [![Build Status](https://travis-ci.org/Starrah/Express-WX.svg)](https://travis-ci.org/Starrah/Express-WX)
 
 ### 搭建微信公众平台后端，如此简单！
