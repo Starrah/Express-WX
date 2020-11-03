@@ -8,7 +8,8 @@ import {LoggableUser, WXRequestWithUser} from "./UserProvider";
 import * as Util from "util"
 import * as Mongoose from "mongoose"
 import {WXRequest} from "./WXRequest";
-import {runCatching} from "./utils";
+import {isPromiseLike, runCatching} from "./utils";
+import {Connection} from "mongoose";
 
 const Mixed = Mongoose.Schema.Types.Mixed
 
@@ -123,12 +124,12 @@ export class MongoDBLogger implements Logger {
     connection: Mongoose.Connection
 
     /**
-     * @param mongoUri MongoDB的URI，形如mongodb://user:password@host:port/database
+     * @param connection 可以传MongoDB的URI，形如mongodb://user:password@host:port/database，也可以传Mongoose的Connection。
      * @param collection 要存储日志的collection的名字
      * @param option 选项配置。其中capped表示集合是否capped，dbName表示使用的database名字（不填则默认为uri中指定的那个database）。
      * 而connectionOption和schemaOption定义的内容是直接原样传给mongoose.createConnection和new mongoose.Schema的，详见Mongoose.js官方文档。
      */
-    constructor(mongoUri: string, collection: string, option?: {
+    constructor(connection: string | Connection, collection: string, option?: {
         capped?: boolean,
         dbName?: string,
         connectionOption?: Mongoose.ConnectionOptions,
@@ -159,11 +160,12 @@ export class MongoDBLogger implements Logger {
         }, option.schemaOption)
 
         // 连接和model构建
-        let pendingConnection = Mongoose.createConnection(mongoUri, option.connectionOption)
-        pendingConnection.then(() => {
-            this.valid = true
-        })
-        this.connection = pendingConnection
+        // 如果是string，则创建连接
+        if (typeof connection === "string") connection = Mongoose.createConnection(connection, option.connectionOption)
+        // 如果是pendingConnection，则then一下
+        if (isPromiseLike(connection)) (connection as any).then(() => this.valid = true)
+        else this.valid = true // 否则直接视为成功
+        this.connection = connection
         this.model = this.connection.model(collection, schema, collection)
     }
 

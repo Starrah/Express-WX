@@ -1,9 +1,9 @@
 import {WXRequest} from "./WXRequest";
 import {Logger, MongoDBLogger} from "./Logger";
 import * as Mongoose from "mongoose"
-import {Document, Model, Schema} from "mongoose";
+import {Connection, Document, Model, Promise, Schema} from "mongoose";
 import * as SendRequest from "request-promise";
-import {assertWXAPISuccess} from "./utils";
+import {assertWXAPISuccess, isPromiseLike} from "./utils";
 import {WXRouter} from "./WXRouter";
 
 export interface LoggableUser {
@@ -101,13 +101,13 @@ export function WXAPIUserProvider(userInfoCacheTimeMs: number = 7200000, toLogDa
  * 返回的对象类型是T & mongoose.Document，同时具有T指定的属性和mongoose提供的文档操作接口，因而对用户的数据的增删改也同样很方便。
  *
  * @constructor
- * @param mongoUri MongoDB的URI，形如mongodb://user:password@host:port/database
+ * @param connection 可以传MongoDB的URI，形如mongodb://user:password@host:port/database，也可以传Mongoose的Connection。
  * @param schema 用户数据对应的mongoose.Schema。
  * @param toLogData 必填，指定如何把用户转换为日志格式。
  * @param option 选项配置。其中dbName表示使用的database名字（不填则默认为uri中指定的那个database）。
  * 而connectionOption的内容是直接原样传给mongoose.createConnection的。
  */
-export function MongoDBUserProvider<T>(mongoUri: string, schema: Schema, toLogData: ToLogDataFuncOfLoggableUser<T>, option?: {
+export function MongoDBUserProvider<T>(connection: string | Connection, schema: Schema, toLogData: ToLogDataFuncOfLoggableUser<T>, option?: {
     dbName?: string,
     connectionOption?: Mongoose.ConnectionOptions,
     openIdFieldName?: string
@@ -119,14 +119,12 @@ export function MongoDBUserProvider<T>(mongoUri: string, schema: Schema, toLogDa
         option.connectionOption.dbName = option.dbName
     }
     let openIdName = option.openIdFieldName || "openId"
-
+    // 最终要返回的Provider函数
     let resFunc: ((openId: string) => Promise<T & Document>) & { valid: boolean, model: Model<T & Document> }
-    let connection = Mongoose.createConnection(mongoUri, option.connectionOption)
-    connection.then(() => {
-        resFunc.valid = true
-    }).catch(() => {
-        resFunc.valid = false
-    })
+
+    // 如果是string，则创建连接
+    if (typeof connection === "string") connection = Mongoose.createConnection(connection, option.connectionOption)
+
     schema.index(openIdName)
     let model: Model<T & Document> = connection.model(schema.get("collection"), schema)
     // @ts-ignore
@@ -138,6 +136,11 @@ export function MongoDBUserProvider<T>(mongoUri: string, schema: Schema, toLogDa
         if (res) (res as LoggableUser).toLogData = toLogData
         return res
     }
+
+    // 如果是pendingConnection，则then一下
+    if (isPromiseLike(connection)) (connection as any).then(() => resFunc.valid = true, () => resFunc.valid = false)
+    else resFunc.valid = true // 否则直接视为成功
+
     resFunc.model = model
     return resFunc
 }
