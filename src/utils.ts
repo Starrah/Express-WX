@@ -15,8 +15,6 @@ export function extendPrototype<T>(baseObj: any, objWithNewProto: T): T {
     let newRootProto = findRootProto(objWithNewProto, baseProto)
     Object.assign(objWithNewProto, baseObj)
     newRootProto.__proto__ = baseProto
-    // @ts-ignore
-    objWithNewProto.__proto__ = newRootProto
     return objWithNewProto
 }
 
