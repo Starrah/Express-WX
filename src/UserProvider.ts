@@ -32,7 +32,7 @@ export type UserProvider = (openId: string) => string | LoggableUser | any | Pro
  *
  * 详见微信公众平台官方文档。
  */
-interface WXAPIUser extends LoggableUser {
+export interface WXAPIUser extends LoggableUser {
     subscribe: 0 | 1
     openid: string
     nickname: string
