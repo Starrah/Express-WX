@@ -110,8 +110,8 @@ class _WXRouterBase implements Router {
             // noinspection ES6MissingAwait
             (async () => {
                 while (!this.destroyed) { // 只要WXRouter没被摧毁，就一直运行
-                    await delay(TRY_UPDATE_CALL_INTERVAL)
                     await this._tryUpdateAccessTokenIfNecessary() // _tryUpdate函数的实现为，如果获取access_token发生异常，只会log warning而不会抛出。
+                    await delay(TRY_UPDATE_CALL_INTERVAL)
                 }
             })()
             if (await checkify(this._assertAccessTokenAvailable).call(this)) { // 如果经检查、获取所需要的配置正确的话

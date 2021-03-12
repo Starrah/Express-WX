@@ -23,23 +23,26 @@ function checkWXSignatureOrDebug(req: Request, wxRouter: WXRouter) {
 }
 
 export default async function ReqProcess(req: WXRequest, res: WXResponse, next, wxRouter: WXRouter, reo: { req, res, next }) {
-    // 检查生命周期情况，未初始化或已销毁则返回错误
-    if (!wxRouter.initialized || wxRouter.destroyed) res.sendStatus(503)
     // 若debug字段正确，则不检查超时和签名
     if (!(wxRouter.config.debugToken && (wxRouter.config.debugToken === req.query.debug ||
         wxRouter.config.debugToken === req.header("debug")))) {
         if (wxRouter.config.messageTimeout &&
             new Date().getTime() - (Number(req.query.timestamp) * 1000) > wxRouter.config.messageTimeout) {
             res.sendStatus(408)
-            return;
+            return
         }
         if (!checkWXSignatureOrDebug(req, wxRouter)) {
             res.sendStatus(403)
-            return;
+            return
         }
     }
-    if (req.query.echostr) {
+    if (req.query.echostr) { // 如果是echostr微信服务器的验证请求，返回echostr
         res.send(req.query.echostr)
+        return
+    }
+    // 检查生命周期情况，未初始化或已销毁则返回错误
+    if (!wxRouter.initialized || wxRouter.destroyed) {
+        res.sendStatus(503)
         return
     }
 
