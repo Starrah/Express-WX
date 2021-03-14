@@ -17,6 +17,7 @@ import {WXRequestWithUser} from "./UserProvider";
 import * as Util from "util"
 import {WXMessage} from "./WXMessage";
 import * as _ from "lodash"
+import * as npmpkg_request from "request"
 
 interface _WXRouterBase extends Router {
 }
@@ -109,8 +110,10 @@ class _WXRouterBase implements Router {
             const TRY_UPDATE_CALL_INTERVAL = _.clamp(Math.round(this.config.accessTokenUpdateInterval / 5), 30000, 600000);
             // noinspection ES6MissingAwait
             (async () => {
+                let firstUpdate = true
                 while (!this.destroyed) { // 只要WXRouter没被摧毁，就一直运行
-                    await this._tryUpdateAccessTokenIfNecessary() // _tryUpdate函数的实现为，如果获取access_token发生异常，只会log warning而不会抛出。
+                    if (firstUpdate) firstUpdate = false // 第一次运行到这里时，不要进行刷新access token的操作，以免重复刷新。
+                    else await this._tryUpdateAccessTokenIfNecessary() // _tryUpdate函数的实现为，如果获取access_token发生异常，只会log warning而不会抛出。
                     await delay(TRY_UPDATE_CALL_INTERVAL)
                 }
             })()
@@ -351,17 +354,40 @@ class _WXRouterBase implements Router {
 
     private _jsapiTicket: string = null
 
+    private async _makeWXAPICgiBinRequest(method: "GET" | "POST", uri: string, options: npmpkg_request.CoreOptions) {
+        try {
+            options.method = method
+            let resObj = await SendRequest(uri, options)
+            assertWXAPISuccess(resObj)
+            return resObj
+        } catch (e) {
+            if (e && e.errcode === 40001) {
+                try {
+                    // 说明是ACCESS_TOKEN问题。刷新token后重试即可。
+                    this.logger.log(`请求微信接口${uri}时发现ACCESS_TOKEN失效！尝试刷新ACCESS_TOKEN后重试！`, "WARNING")
+                    await this.updateAccessToken()
+                    let resObj = await SendRequest(uri, options)
+                    assertWXAPISuccess(resObj)
+                    return resObj
+                } catch (e2) {
+                    e = e2
+                }
+            }
+            this.logger.log(`请求微信接口${uri}时发生异常：${JSON.stringify(e)}`, "ERROR")
+            throw e
+        }
+    }
+
     async updateJsapiTicket(_requestByAutoUpdate = false): Promise<string> {
         try {
             let accessToken = this.accessToken
-            let resObj = await SendRequest.get("https://api.weixin.qq.com/cgi-bin/ticket/getticket", {
+            let resObj = await this._makeWXAPICgiBinRequest("GET", "https://api.weixin.qq.com/cgi-bin/ticket/getticket", {
                 qs: {
                     access_token: accessToken,
                     type: "jsapi"
                 },
                 json: true
             })
-            assertWXAPISuccess(resObj)
             this._jsapiTicket = resObj.ticket
             this.logger.log((_requestByAutoUpdate ? "自动" : "手动") + "刷新JSAPI_TIKET成功！", "INFO")
             return resObj.ticket
@@ -408,14 +434,13 @@ class _WXRouterBase implements Router {
         let json = message.toJson()
         json.touser = openId
         if (kf_account) json.customservice = {kf_account}
-        let resObj = await SendRequest.post("https://api.weixin.qq.com/cgi-bin/message/custom/send", {
+        let resObj = await this._makeWXAPICgiBinRequest("POST", "https://api.weixin.qq.com/cgi-bin/message/custom/send", {
             qs: {
                 access_token: this.accessToken,
             },
             body: json,
             json: true
         })
-        assertWXAPISuccess(resObj)
     }
 
     /**
@@ -430,14 +455,13 @@ class _WXRouterBase implements Router {
             touser: openId,
             command: typing ? "Typing" : "CancelTyping"
         }
-        let resObj = await SendRequest.post("https://api.weixin.qq.com/cgi-bin/message/custom/typing", {
+        let resObj = await this._makeWXAPICgiBinRequest("POST", "https://api.weixin.qq.com/cgi-bin/message/custom/typing", {
             qs: {
                 access_token: this.accessToken,
             },
             body: json,
             json: true
         })
-        assertWXAPISuccess(resObj)
     }
 
     /**
@@ -449,13 +473,12 @@ class _WXRouterBase implements Router {
         /** 表示模版content中的所有可填入的字段，每一个值"xxx"与模版中一个{{xxx.DATA}}是对应的。微信返回的数据包本来没有这个功能，是本框架提供的。 */
         data_keys: Array<string>
     }>> {
-        let resObj = await SendRequest.get("https://api.weixin.qq.com/cgi-bin/template/get_all_private_template", {
+        let resObj = await this._makeWXAPICgiBinRequest("GET", "https://api.weixin.qq.com/cgi-bin/template/get_all_private_template", {
             qs: {
                 access_token: this.accessToken,
             },
             json: true
         })
-        assertWXAPISuccess(resObj)
         return (resObj.template_list as Array<any>).map((v) => {
             // noinspection RegExpRedundantEscape
             let reg = /\{\{(\w+)\.DATA\}\}/g
@@ -495,14 +518,13 @@ class _WXRouterBase implements Router {
             url: jump.url,
             miniprogram: jump.miniprogram
         }
-        let resObj = await SendRequest.post("https://api.weixin.qq.com/cgi-bin/message/template/send", {
+        let resObj = await this._makeWXAPICgiBinRequest("POST", "https://api.weixin.qq.com/cgi-bin/message/template/send", {
             qs: {
                 access_token: this.accessToken,
             },
             body: json,
             json: true
         })
-        assertWXAPISuccess(resObj)
         return resObj.msgid
     }
 }
