@@ -34,7 +34,9 @@ export async function watchRecursively(path: string, extraCallback?: FsWatchCall
             if (stat.isDirectory()) {
                 watchDir(filename)
                 extraCallback(event, filename, "dirAdd")
-            } else extraCallback(event, filename, "fileAdd")
+            } else {
+                extraCallback(event, filename, "fileAdd")
+            }
         } else {
             extraCallback(event, filename, "fileChange")
         }

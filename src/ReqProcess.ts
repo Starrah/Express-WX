@@ -40,7 +40,9 @@ export default async function ReqProcess(req: WXRequest, res: WXResponse, next, 
         res.send(req.query.echostr)
         return
     }
-    // 检查生命周期情况，未初始化或已销毁则返回错误
+    if (!wxRouter.initialized){
+        await wxRouter.tillInitialized()
+    }
     if (!wxRouter.initialized || wxRouter.destroyed) {
         res.sendStatus(503)
         return

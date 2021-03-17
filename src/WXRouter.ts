@@ -31,6 +31,7 @@ class _WXRouterBase implements Router {
 
     assertInitialized() {
         if (!this.initialized) throw Error("本WXRouter的实例需要异步初始化，而该过程还未完成，因此暂无法执行要求的功能。请稍后再试！")
+        if (this.destroyed) throw Error("本WXRouter的实例已经被销毁！")
     }
 
     private _destroyed: boolean = false
@@ -40,7 +41,7 @@ class _WXRouterBase implements Router {
 
     /** 返回一个Promise，它在当前WXRouter对象初始化完成后才予以resolve。只要初始化没有完成，就会一直pending。*/
     async tillInitialized() {
-        while (!this.initialized) {
+        while (!this.initialized && !this.destroyed) {
             await delay(20)
         }
         return
@@ -402,6 +403,7 @@ class _WXRouterBase implements Router {
      * @return 签名所需的字段。详见WxJSApiSignParam接口注释。
      */
     async signJSAPI(param: WxJSApiSignParam): Promise<WxJSApiSignResult> {
+        this.assertInitialized()
         if (!param.url) throw Error("传入的参数中缺少ur字段！")
         param.timestamp = param.timestamp || Math.round(new Date().getTime() / 1000)
         param.noncestr = param.noncestr || RandomString.generate()
@@ -431,10 +433,11 @@ class _WXRouterBase implements Router {
      * @param kf_account 选填，可以指定发送该消息的客服账号，详见威信官方文档。
      */
     async sendCustomMessage(openId: string, message: WXMessage, kf_account?: string) {
+        this.assertInitialized()
         let json = message.toJson()
         json.touser = openId
         if (kf_account) json.customservice = {kf_account}
-        let resObj = await this._makeWXAPICgiBinRequest("POST", "https://api.weixin.qq.com/cgi-bin/message/custom/send", {
+        await this._makeWXAPICgiBinRequest("POST", "https://api.weixin.qq.com/cgi-bin/message/custom/send", {
             qs: {
                 access_token: this.accessToken,
             },
@@ -451,11 +454,12 @@ class _WXRouterBase implements Router {
      * @param typing 必填，true表示正在输入、false表示取消正在输入
      */
     async sendCustomTypingStatus(openId: string, typing: boolean) {
+        this.assertInitialized()
         let json = {
             touser: openId,
             command: typing ? "Typing" : "CancelTyping"
         }
-        let resObj = await this._makeWXAPICgiBinRequest("POST", "https://api.weixin.qq.com/cgi-bin/message/custom/typing", {
+        await this._makeWXAPICgiBinRequest("POST", "https://api.weixin.qq.com/cgi-bin/message/custom/typing", {
             qs: {
                 access_token: this.accessToken,
             },
@@ -473,6 +477,7 @@ class _WXRouterBase implements Router {
         /** 表示模版content中的所有可填入的字段，每一个值"xxx"与模版中一个{{xxx.DATA}}是对应的。微信返回的数据包本来没有这个功能，是本框架提供的。 */
         data_keys: Array<string>
     }>> {
+        this.assertInitialized()
         let resObj = await this._makeWXAPICgiBinRequest("GET", "https://api.weixin.qq.com/cgi-bin/template/get_all_private_template", {
             qs: {
                 access_token: this.accessToken,
@@ -507,6 +512,7 @@ class _WXRouterBase implements Router {
     async sendTemplateMessage(openId: string, template_id: string,
                               data: { [k: string]: string | { value: string, color: string } },
                               jump?: { url?: string, miniprogram?: { appid: string, pagepath: string } }): Promise<string> {
+        this.assertInitialized()
         for (let k in data) {
             if (typeof data[k] === "string") data[k] = {value: data[k] as string, color: "#000000"}
         }
