@@ -28,6 +28,7 @@ class _WXRouterBase implements Router {
     get initialized(): boolean {
         return this._initialized
     }
+    private _initialized_time: Date
 
     assertInitialized() {
         if (!this.initialized) throw Error("本WXRouter的实例需要异步初始化，而该过程还未完成，因此暂无法执行要求的功能。请稍后再试！")
@@ -47,9 +48,11 @@ class _WXRouterBase implements Router {
         return
     }
 
-    private _onDestroy() {
-        this._destroyed = true
-        this.logger.log("WXRouter被销毁！", "WARNING")
+    onDestroy() {
+        if (!this._destroyed) {
+            this._destroyed = true
+            this.logger.log(`WXRouter被销毁！（初始化于${this._initialized_time?.toLocaleString()} ${this.appInfo.APPID || ""}）`, "WARNING")
+        }
     }
 
 
@@ -89,14 +92,6 @@ class _WXRouterBase implements Router {
             // 异步调用appInfo获取函数
             this.appInfo = await appInfo
 
-            // 建立文件删除监听器，当本文件被删除，自动调用_onDestroy标记本实例为已销毁。
-            let myPath = module.path
-            await watchRecursively(myPath, (event, filename, type) => {
-                if ((type === "fileRemove" || type === "fileChange") && Path.resolve(myPath) === Path.resolve(filename)) {
-                    this._onDestroy()
-                }
-            })
-
             // 监视文件夹和加载初始路由
             for (let oneDir of handlersDirArr) {
                 await watchRecursively(oneDir, generateOnChangeCb(this))
@@ -124,6 +119,7 @@ class _WXRouterBase implements Router {
             }
 
             this._initialized = true
+            this._initialized_time = new Date()
             this.logger.log("WXRouter初始化成功！")
         }).call(base)
         // @ts-ignore
