@@ -125,8 +125,10 @@ export function MongoDBUserProvider<T>(connection: string | Connection, schema: 
     // 如果是string，则创建连接
     if (typeof connection === "string") connection = Mongoose.createConnection(connection, option.connectionOption)
 
-    schema.index(openIdName)
-    let model: Model<T & Document> = connection.model(schema.get("collection"), schema)
+    const indexDefinition = {}
+    indexDefinition[openIdName] = 1
+    schema.index(indexDefinition)
+    let model: Model<T & Document> = <Model<any & Document>>connection.model(schema.get("collection"), schema)
     // @ts-ignore
     resFunc = async function (openId: string): T {
         if (resFunc.valid === false) throw Error("MongoDB连接失败，故无法查询用户！")
