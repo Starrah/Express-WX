@@ -1,0 +1,28 @@
+name: Build and Deploy
+
+on:
+  push:
+    tags: [ 'v1.*', 'v2.*' ]
+
+jobs:
+  test_and_build:
+    uses: Starrah/Express-WX/.github/workflows/build.yml@master
+    with:
+      upload_artifact: true
+  deploy:
+    needs: test_and_build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Use Node.js 16.x
+      uses: actions/setup-node@v2
+      with:
+        node-version: 16.x
+        registry-url: https://registry.npmjs.org/
+    - uses: actions/download-artifact@master
+      with:
+        name: bld
+        path: "./bld"
+    - run: npm publish
+      env:
+        NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
