@@ -1,5 +1,6 @@
 import {Response} from "express"
-import {extendPrototype, xmlGetKey, xmlSetText} from "./utils";
+import {xmlGetKey, xmlSetText} from "./utils";
+import {extendPrototype} from "@starrah/prototype-utils";
 import {WXRouter} from "./WXRouter";
 import {NoResponseWXMessage, TextWXMessage, WXMessage} from "./WXMessage";
 import {js2xml} from "xml-js";

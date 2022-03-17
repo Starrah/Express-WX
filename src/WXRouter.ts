@@ -1,6 +1,7 @@
 import {Request, RequestHandler, Response, Router} from 'express'
 import {mergeConfigWithDefault, WXAPPInfo, WXRouterConfig} from "./config";
-import {assertWXAPISuccess, checkify, extendPrototype} from "./utils";
+import {assertWXAPISuccess, checkify} from "./utils";
+import {extendPrototype} from "@starrah/prototype-utils";
 import ReqProcess, {signFields} from "./ReqProcess";
 import {WXRequest} from "./WXRequest";
 import {WXResponse} from "./WXResponse";

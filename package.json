@@ -27,9 +27,10 @@
     "@types/request-promise": "^4.1.46",
     "chai": "^4.2.0",
     "mocha": "^8.1.1",
-    "typescript": "^3.9.7"
+    "typescript": "^4.6.2"
   },
   "dependencies": {
+    "@starrah/prototype-utils": "^0.1.1",
     "body-parser": "^1.19.0",
     "chalk": "^4.1.0",
     "delay": "^4.4.0",

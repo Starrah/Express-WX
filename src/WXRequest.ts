@@ -1,5 +1,5 @@
 import {Request} from "express"
-import {extendPrototype} from "./utils";
+import {extendPrototype} from "@starrah/prototype-utils";
 import {WXRouter} from "./WXRouter";
 import {WXMessage} from "./WXMessage";
 

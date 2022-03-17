@@ -2,7 +2,7 @@ Express-WX
 ===================
 [![NPM Package](https://badge.fury.io/js/express-wx.svg)](https://www.npmjs.com/package/express-wx)
 [![Downloads](https://img.shields.io/npm/dt/express-wx)](https://www.npmjs.com/package/express-wx)
-[![Build Status](https://travis-ci.com/Starrah/Express-WX.svg)](https://travis-ci.com/Starrah/Express-WX)
+[![Build Status](https://github.com/Starrah/Express-WX/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/Starrah/Express-WX/actions/workflows/build.yml)
 
 ### 搭建微信公众平台后端，如此简单！
 Express-WX is an [Express](https://github.com/expressjs/express) Router used for building [Wechat](https://weixin.qq.com/) (an instant messaging software, especially popular in China) Offical Account Message Server easily, supporting loading request (message) handlers dynamically.  
