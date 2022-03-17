@@ -40,9 +40,6 @@ export default async function ReqProcess(req: WXRequest, res: WXResponse, next, 
         res.send(req.query.echostr)
         return
     }
-    if (!wxRouter.initialized){
-        await wxRouter.tillInitialized()
-    }
     if (!wxRouter.initialized || wxRouter.destroyed) {
         res.sendStatus(503)
         return

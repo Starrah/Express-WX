@@ -181,7 +181,10 @@ class _WXRouterBase implements Router {
         }
     }
 
-    handleRequest(req: Request, res: Response, next) {
+    async handleRequest(req: Request, res: Response, next) {
+        if (!this.initialized){
+            await this.tillInitialized()
+        }
         ReqProcess(req as WXRequest, res as WXResponse, this._nextFunction.bind(this, 0, {
             curHandlers: this._handlers.concat(),
             lastNextCallIndex: -1
